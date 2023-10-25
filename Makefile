@@ -1,6 +1,6 @@
 .PHONY: tests
 tests:
-	pytest tests
+	pytest tests -vv
 
 fmt:
 	black .
