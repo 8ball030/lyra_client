@@ -4,7 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["8baller <8ball030@gmail.com>"]
 readme = "README.md"
-packages = [{include = "lyra_trading"}]
+packages = [{include = "lyra"}]
 
 [tool.poetry.dependencies]
 python = ">=3.8.1,<4.0"
