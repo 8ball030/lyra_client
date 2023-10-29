@@ -3,7 +3,7 @@ Tests for the main function.
 """
 import pytest
 
-from lyra.main import InstrumentType, LyraClient, UnderlyingCurrency, main
+from lyra.main import InstrumentType, LyraClient, OrderSide, OrderType, UnderlyingCurrency, main
 
 TEST_WALLET = "0x3A5c777edf22107d7FdFB3B02B0Cdfe8b75f3453"
 TEST_PRIVATE_KEY = "0xc14f53ee466dd3fc5fa356897ab276acbef4f020486ec253a23b0d1c3f89d4f4"
@@ -47,3 +47,22 @@ def test_fetch_subaccounts(lyra_client):
     Test the LyraClient class.
     """
     assert lyra_client.fetch_subaccounts(TEST_WALLET)
+
+
+def test_create_order(lyra_client):
+    """
+    Test the LyraClient class.
+    """
+    assert lyra_client.create_order(
+        price=200,
+        amount=1,
+        instrument_name="ETH-PERP",
+        side=OrderSide.BUY,
+        order_type=OrderType.LIMIT,
+    )
+
+
+def test_define_order(lyra_client):
+    """
+    Test the LyraClient class.
+    """

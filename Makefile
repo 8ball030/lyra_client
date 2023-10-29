@@ -3,8 +3,10 @@ tests:
 	pytest tests -vv
 
 fmt:
-	black .
-	isort tests lyra
+	poetry run black tests lyra 
+	poetry run isort tests lyra
 
 lint:
-	flake8 .
+	poetry run flake8 tests lyra
+
+all: fmt lint tests
