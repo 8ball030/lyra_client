@@ -102,6 +102,30 @@ class LyraClient:
             raise Exception(result_code["error"])
         return True
 
+    def build_register_session_key_tx(self, expiry_sec: int):
+        """Build register session key transaction."""
+
+        endpoint = "build_register_session_key_tx"
+        payload = {
+            "expiry_sec": expiry_sec,
+            "wallet": self.wallet.address,
+        }
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "expiry_sec": str(expiry_sec),
+            "wallet": self.wallet.address,
+            "gas": "0",
+            "nonce": "0",
+            "public_session_key": self.wallet.address,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+        result = json.loads(response.content)["result"]
+        return result
+
     def fetch_tickers(
         self,
         expired=True,
