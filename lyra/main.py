@@ -106,10 +106,6 @@ class LyraClient:
         """Build register session key transaction."""
 
         endpoint = "build_register_session_key_tx"
-        payload = {
-            "expiry_sec": expiry_sec,
-            "wallet": self.wallet.address,
-        }
         url = f"{BASE_URL}/public/{endpoint}"
         payload = {
             "expiry_sec": str(expiry_sec),

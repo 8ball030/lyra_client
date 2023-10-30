@@ -49,6 +49,14 @@ def test_fetch_subaccounts(lyra_client):
     assert lyra_client.fetch_subaccounts(TEST_WALLET)
 
 
+def test_build_register_session_key_tx(lyra_client):
+    """Test build_register_session_key_tx"""
+
+    expiry_sec = str(int(time.time() * 1000) + 1000)
+    tx = lyra_client.build_register_session_key_tx(expiry_sec)
+    assert tx["tx_params"]
+
+
 def test_create_order(lyra_client):
     """
     Test the LyraClient class.
