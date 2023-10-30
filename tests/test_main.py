@@ -32,7 +32,8 @@ def test_lyra_client_fetch_tickers(lyra_client):
     """
     Test the LyraClient class.
     """
-    assert lyra_client.fetch_tickers(instrument_type=InstrumentType.PERP.value, currency=UnderlyingCurrency.ETH.value)
+    res = lyra_client.fetch_tickers(instrument_type=InstrumentType.PERP.value, currency=UnderlyingCurrency.ETH.value)
+    breakpoint()
 
 
 def test_create_signature_headers(lyra_client):
@@ -46,7 +47,10 @@ def test_fetch_subaccounts(lyra_client):
     """
     Test the LyraClient class.
     """
-    assert lyra_client.fetch_subaccounts(TEST_WALLET)
+    accounts = lyra_client.fetch_subaccounts(TEST_WALLET)
+    breakpoint()
+    assert accounts['subaccounts']
+
 
 
 def test_create_order(lyra_client):

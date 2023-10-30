@@ -18,6 +18,14 @@ BASE_URL = "https://api-demo.lyra.finance"
 
 PUBLIC_HEADERS = {"accept": "application/json", "content-type": "application/json"}
 
+ACTION_TYPEHASH = '0x4d7a9f27c403ff9c0f19bce61d76d82f9aa29f8d6d4b0c5474607d9770d1af17'
+DOMAIN_SEPARATOR = '0xff2ba7c8d1c63329d3c2c6c9c19113440c004c51fe6413f65654962afaff00f3'
+ASSET_ADDRESS = '0x8932cc48F7AD0c6c7974606cFD7bCeE2F543a124'
+TRADE_MODULE_ADDRESS = '0x63Bc9D10f088eddc39A6c40Ff81E99516dfD5269'
+
+OPTION_NAME = 'ETH-20231027-1500-P'
+OPTION_SUB_ID = '644245094401698393600'
+
 
 class InstrumentType(Enum):
     ERC20 = "erc20"
@@ -46,13 +54,7 @@ class TimeInForce(Enum):
     FOK = "fok"
 
 
-ACTION_TYPEHASH = '0x4d7a9f27c403ff9c0f19bce61d76d82f9aa29f8d6d4b0c5474607d9770d1af17'
-DOMAIN_SEPARATOR = '0xff2ba7c8d1c63329d3c2c6c9c19113440c004c51fe6413f65654962afaff00f3'
-ASSET_ADDRESS = '0x8932cc48F7AD0c6c7974606cFD7bCeE2F543a124'
-TRADE_MODULE_ADDRESS = '0x63Bc9D10f088eddc39A6c40Ff81E99516dfD5269'
 
-OPTION_NAME = 'ETH-20231027-1500-P'
-OPTION_SUB_ID = '644245094401698393600'
 
 
 w3 = Web3()
@@ -196,6 +198,39 @@ class LyraClient:
         )
 
         return w3.keccak(encoded)
+
+    # private apis
+    def create_subaccount(
+            amount,
+            asset_name,
+            currency="USDT",
+            margin_type="SM",
+    ):
+        """
+        Create a subaccount
+        """
+        endpoint = "create_subaccount"
+        url = f"{BASE_URL}/private/{endpoint}"
+
+        payload = {
+            "amount": "",
+            "asset_name": "string",
+            "currency": "string",
+            "margin_type": "PM",
+            "nonce": 0,
+            "signature": "string",
+            "signature_expiry_sec": 0,
+            "signer": "string",
+            "wallet": "string"
+        }
+        headers = {
+            "accept": "application/json",
+            "content-type": "application/json"
+        }
+
+        response = requests.post(url, json=payload, headers=headers)
+
+        print(response.text)
 
 
 def main():

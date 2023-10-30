@@ -15,6 +15,8 @@ eth-tester = "^0.9.1b1"
 black = "^23.10.1"
 isort = "^5.12.0"
 flake8 = "^6.1.0"
+websocket-client = "^1.6.4"
+setuptools = "^68.2.2"
 
 
 [build-system]
