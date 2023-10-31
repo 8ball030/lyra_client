@@ -67,6 +67,13 @@ def test_register_session_key(lyra_client):
     assert tx_receipt["transaction_id"]
 
 
+def test_login(lyra_client):
+    """Test login"""
+
+    login = lyra_client.login()
+    assert login
+
+
 def test_get_instrument(lyra_client, name="ETH-20231103-1600-P"):
     """Test get_instrument"""
 
