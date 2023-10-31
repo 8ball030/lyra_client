@@ -224,6 +224,7 @@ class PublicAPI(LyraBaseClient):
         result = json.loads(response.content)["result"]
         return result
 
+
 class PrivateAPI(LyraBaseClient):
     """Private API methods for the Lyra dex."""
 

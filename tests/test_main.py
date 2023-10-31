@@ -85,6 +85,14 @@ def test_get_instruments(lyra_client, currency, expired, instrument_type):
     assert instruments
 
 
+@pytest.mark.parametrize("currency", UnderlyingCurrency)
+def test_get_latest_signed_feeds(lyra_client, currency):
+    """Test get_latest_signed_feeds"""
+
+    latest_signed_feeds = lyra_client.get_latest_signed_feeds(currency)
+    assert list(latest_signed_feeds) == ['spot_data', 'fwd_data', 'vol_data', 'perp_data']
+
+
 def test_create_order(lyra_client):
     """
     Test the LyraClient class.
