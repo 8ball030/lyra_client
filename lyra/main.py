@@ -122,6 +122,29 @@ class LyraClient:
         result = json.loads(response.content)["result"]
         return result
 
+    def register_session_key(self, tx_params: dict, expiry_sec: int):
+        """Register session key"""
+
+        tx_params.pop("gasLimit", None)
+        signed_tx = self.wallet.sign_transaction(tx_params)
+        endpoint = "register_session_key"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "expiry_sec": str(expiry_sec),
+            "label": self.wallet.address[:16],
+            "signed_raw_tx": signed_tx.rawTransaction.hex(),
+            "public_session_key": self.wallet.address,
+            "wallet": self.wallet.address,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+
+        result = json.loads(response.content)["result"]
+        return result
+
     def fetch_tickers(
         self,
         expired=True,
