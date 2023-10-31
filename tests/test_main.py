@@ -93,6 +93,18 @@ def test_get_latest_signed_feeds(lyra_client, currency):
     assert list(latest_signed_feeds) == ['spot_data', 'fwd_data', 'vol_data', 'perp_data']
 
 
+# @pytest.mark.parametrize("currency", UnderlyingCurrency)
+# def test_get_spot_feed_history(lyra_client, currency):
+#     """Test get_spot_feed_history"""
+
+#     start_timestamp = 0
+#     end_timestamp = int(time.time() * 1000)
+#     period = 1
+#     latest_signed_feeds = lyra_client.get_spot_feed_history(currency, start_timestamp, end_timestamp, period)
+#     assert latest_signed_feeds
+
+
+
 def test_create_order(lyra_client):
     """
     Test the LyraClient class.
