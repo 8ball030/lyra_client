@@ -67,6 +67,13 @@ def test_register_session_key(lyra_client):
     assert tx_receipt["transaction_id"]
 
 
+def test_get_instrument(lyra_client, name="ETH-20231103-1600-P"):
+    """Test get_instrument"""
+
+    instrument = lyra_client.get_instrument(name)
+    assert instrument
+
+
 @pytest.mark.parametrize(
     "currency, expired, instrument_type",
     itertools.product(UnderlyingCurrency, [True, False], InstrumentType)
