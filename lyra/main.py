@@ -208,6 +208,21 @@ class PublicAPI(LyraBaseClient):
         results = json.loads(response.content)["result"]
         return results
 
+    def get_latest_signed_feeds(self, currency: UnderlyingCurrency):
+        """Get latest signed feeds"""
+
+        endpoint = "get_latest_signed_feeds"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "currency": currency.value.upper(),
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+        result = json.loads(response.content)["result"]
+        return result
 
 class PrivateAPI(LyraBaseClient):
     """Private API methods for the Lyra dex."""
