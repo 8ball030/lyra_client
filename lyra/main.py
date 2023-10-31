@@ -224,6 +224,31 @@ class PublicAPI(LyraBaseClient):
         result = json.loads(response.content)["result"]
         return result
 
+    def get_spot_feed_history(
+        self,
+        currency: UnderlyingCurrency,
+        start_timestamp: int,
+        end_timestamp: int,
+        period: int,
+    ):
+        """Get spot feed history"""
+
+        endpoint = "get_spot_feed_history"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "currency": currency.value.upper(),
+            "start_timestamp": start_timestamp,
+            "end_timestamp": end_timestamp,
+            "period": period,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+        result = json.loads(response.content)["result"]
+        return result
+
 
 class PrivateAPI(LyraBaseClient):
     """Private API methods for the Lyra dex."""
