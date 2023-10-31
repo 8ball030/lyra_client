@@ -104,6 +104,14 @@ def test_get_latest_signed_feeds(lyra_client, currency):
 #     assert latest_signed_feeds
 
 
+def test_get_transaction(lyra_client):
+    """Test get_transaction"""
+
+    transaction_hash = "0xc2e7fc758d39f115ad6388c5e3c8fcc2158c6431c67b80ceddb44a9c31056036"
+    transaction_id = "123e4567-e89b-12d3-a456-426655440000"  # UUID expected
+    transaction = lyra_client.get_transaction(transaction_id)
+    assert transaction
+
 
 def test_create_order(lyra_client):
     """
