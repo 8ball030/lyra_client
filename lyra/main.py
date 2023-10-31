@@ -88,7 +88,6 @@ class LyraBaseClient:
 class PublicAPI(LyraBaseClient):
     """Public API methods for the Lyra dex."""
 
-
     def create_account(self, wallet):
         """Call the create account endpoint."""
         endpoint = "create_account"
@@ -145,6 +144,22 @@ class PublicAPI(LyraBaseClient):
             json=payload,
         )
 
+        result = json.loads(response.content)["result"]
+        return result
+
+    def get_instrument(self, instrument_name: str):
+        """Get instrument."""
+
+        endpoint = "get_instrument"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "instrument_name": instrument_name,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
         result = json.loads(response.content)["result"]
         return result
 
