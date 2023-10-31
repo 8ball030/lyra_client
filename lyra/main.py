@@ -62,17 +62,21 @@ def to_32byte_hex(val):
     return Web3.to_hex(Web3.to_bytes(val).rjust(32, b"\0"))
 
 
-class LyraClient:
-    """Client for the lyra dex."""
+class LyraBaseClient:
+    """Base client for the Lyra DEX."""
+
+    def __init__(self, private_key):
+        """
+        Initialize the base LyraClient class.
+        """
+        self.wallet = w3.eth.account.from_key(private_key)
 
     def _create_signature_headers(self):
         """
         Create the signature headers
         """
         timestamp = str(int(time.time() * 1000))
-        msg = encode_defunct(
-            text=timestamp,
-        )
+        msg = encode_defunct(text=timestamp)
         signature = self.wallet.sign_message(msg)
         return {
             "X-LyraWallet": self.wallet.address,
@@ -80,11 +84,10 @@ class LyraClient:
             "X-LyraSignature": Web3.to_hex(signature.signature),
         }
 
-    def __init__(self, private_key):
-        """
-        Initialize the LyraClient class.
-        """
-        self.wallet = w3.eth.account.from_key(private_key)
+
+class PublicAPI(LyraBaseClient):
+    """Public API methods for the Lyra dex."""
+
 
     def create_account(self, wallet):
         """Call the create account endpoint."""
@@ -190,6 +193,10 @@ class LyraClient:
         results = json.loads(response.content)["result"]
         return results
 
+
+class PrivateAPI(LyraBaseClient):
+    """Private API methods for the Lyra dex."""
+
     def fetch_subaccounts(self, wallet):
         """
         Returns the subaccounts for a given wallet
@@ -228,7 +235,7 @@ class LyraClient:
         signed_order = self.__sign_order(encoded_order)
         print(url, signed_order)
 
-    def __encode_order(self, order):
+    def _encode_order(self, order):
         """
         We have to do some work here.
         let encoded_data = encoder.encode( // same as "encoded_data" in public/order_debug
@@ -257,6 +264,26 @@ class LyraClient:
         )
 
         return w3.keccak(encoded)
+
+    def _define_order(self, option_name, subaccount_id):
+        """
+        Define the order.
+        """
+
+    def _sign_order(self, encoded_order):
+        """
+        Sign the order.
+        """
+
+
+class LyraClient(PublicAPI, PrivateAPI):
+
+    def __init__(self, private_key):
+        """
+        Initialize the LyraClient class.
+        """
+        PublicAPI.__init__(self, private_key)
+        PrivateAPI.__init__(self, private_key)
 
 
 def main():
