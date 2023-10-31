@@ -266,6 +266,23 @@ class PublicAPI(LyraBaseClient):
         result = json.loads(response.content)["result"]
         return result
 
+    def get_margin(self, transaction_id: str):
+        """Get margin"""
+
+        endpoint = "get_margin"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "transaction_id": transaction_id,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+
+        result = json.loads(response.content)["result"]
+        return result
+
 
 class PrivateAPI(LyraBaseClient):
     """Private API methods for the Lyra dex."""
