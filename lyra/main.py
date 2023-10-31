@@ -148,6 +148,10 @@ class PublicAPI(LyraBaseClient):
         result = json.loads(response.content)["result"]
         return result
 
+    def deregister_session_key(self, tx_params: dict):
+        """Deregister session key"""
+        raise NotImplementedError()
+
     def generate_signature(self, message):
         message = message.encode('utf-8')
         message_hash = hashlib.sha256(message).digest()
