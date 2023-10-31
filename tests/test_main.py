@@ -113,6 +113,14 @@ def test_get_transaction(lyra_client):
     assert transaction
 
 
+def test_get_margin(lyra_client):
+    """Test get_margin"""
+
+    transaction_id = "123e4567-e89b-12d3-a456-426655440000"
+    transaction = lyra_client.get_margin(transaction_id)
+    assert transaction
+
+
 def test_create_order(lyra_client):
     """
     Test the LyraClient class.
