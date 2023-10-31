@@ -4,7 +4,6 @@ Lyra is a Python library for trading on lyra v2
 import json
 import time
 from enum import Enum
-import hashlib
 
 # we need to encode the abi for the contract
 # const encoder = ethers.AbiCoder.defaultAbiCoder();
