@@ -66,6 +66,16 @@ def test_register_session_key(lyra_client):
     assert tx_receipt["transaction_id"]
 
 
+def test_get_instruments(lyra_client):
+    """Test get_instruments"""
+
+    currency = UnderlyingCurrency.ETH
+    expired = True
+    instrument_type = InstrumentType.PERP
+    instruments = lyra_client.get_instruments(currency, expired, instrument_type)
+    assert intruments
+
+
 def test_create_order(lyra_client):
     """
     Test the LyraClient class.
