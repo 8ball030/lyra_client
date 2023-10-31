@@ -246,6 +246,7 @@ class PublicAPI(LyraBaseClient):
             url=url,
             json=payload,
         )
+        # This doesn't work because we get we get HTML returned
         result = json.loads(response.content)["result"]
         return result
 
@@ -282,6 +283,10 @@ class PublicAPI(LyraBaseClient):
 
         result = json.loads(response.content)["result"]
         return result
+
+    def create_subaccount_debug(self):
+        """Create subaccount debug"""
+        raise NotADirectoryError()
 
 
 class PrivateAPI(LyraBaseClient):
