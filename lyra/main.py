@@ -4,6 +4,7 @@ Lyra is a Python library for trading on lyra v2
 import json
 import time
 from enum import Enum
+import hashlib
 
 # we need to encode the abi for the contract
 # const encoder = ethers.AbiCoder.defaultAbiCoder();
@@ -142,6 +143,24 @@ class LyraClient:
             json=payload,
         )
 
+        result = json.loads(response.content)["result"]
+        return result
+
+    def get_instruments(self, currency: UnderlyingCurrency, expired: bool, intrument_type: InstrumentType):
+        """Get instruments."""
+
+        endpoint = "get_instruments"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "currency": currency.value.upper(),
+            "expired": expired,
+            "instrument_type": intrument_type.value,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
         result = json.loads(response.content)["result"]
         return result
 
