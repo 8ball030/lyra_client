@@ -1,3 +1,4 @@
+import eth_abi
 from datetime import datetime
 from pprint import pprint
 import json
@@ -57,16 +58,18 @@ def login_client(ws):
 def define_order():
 
     ts = int(datetime.now().timestamp() * 1000) 
+    ts = 1698956141
 
     return {
         'instrument_name': OPTION_NAME,
         'subaccount_id': subaccount_id,
         'direction': 'buy',
-        'limit_price': 310,
-        'amount': 1,
-        'signature_expiry_sec': int(ts / 1000) + 300,
+        'limit_price': 1310,
+        'amount': 100,
+        'signature_expiry_sec': int(ts ) + 3000,
         'max_fee': '0.01',
-        'nonce': int(f"{int(ts)}{random.randint(100, 999)}"),
+        # 'nonce': int(f"{int(ts)}{random.randint(100, 999)}"),
+        'nonce': int(f"{int(ts)}{997}"),
         'signer': account.address,
         'order_type': 'limit',
         'mmp': False,
@@ -75,7 +78,7 @@ def define_order():
 
 
 def encode_trade_data(order):
-    encoded_data = w3.solidity_keccak(['address', 'uint256', 'int256', 'int256', 'uint256', 'uint256', 'bool'],
+    encoded_data = eth_abi.encode(['address', 'uint256', 'int256', 'int256', 'uint256', 'uint256', 'bool'],
                                      [ASSET_ADDRESS,
                                       int(OPTION_SUB_ID),
                                       w3.to_wei(order['limit_price'], 'ether'),
@@ -83,14 +86,17 @@ def encode_trade_data(order):
                                       w3.to_wei(order['max_fee'], 'ether'),
                                       order['subaccount_id'],
                                       order['direction'] == 'buy'])
-    return encoded_data
+
+    return w3.keccak(encoded_data)
 
 
 def sign_order(order):
     trade_module_data = encode_trade_data(order)
 
-    action_hash = w3.solidity_keccak(['bytes32', 'uint256', 'uint256', 'address', 'bytes32', 'uint256', 'address', 'address'],
-                                    [ACTION_TYPEHASH,
+    print('Signing Trade module data:', trade_module_data.hex())
+
+    encoded_action_hash = eth_abi.encode(['bytes32', 'uint256', 'uint256', 'address', 'bytes32', 'uint256', 'address', 'address'],
+                                    [bytes.fromhex(ACTION_TYPEHASH[2:]),
                                      order['subaccount_id'],
                                      order['nonce'],
                                      TRADE_MODULE_ADDRESS,
@@ -99,10 +105,18 @@ def sign_order(order):
                                      account.address,
                                      order['signer']])
 
-    typed_data_hash = w3.solidity_keccak(['bytes2', 'bytes32', 'bytes32'],
-                                        ['0x19',
-                                         bytes.fromhex(DOMAIN_SEPARATOR[2:]),
-                                         action_hash])
+    action_hash = w3.keccak(encoded_action_hash)
+
+    print('Signing Action hash:', action_hash.hex())
+
+
+    encoded_typed_data_hash = "".join(['0x1901', DOMAIN_SEPARATOR[2:], action_hash.hex()[2:]])
+                                        # [   bytes.fromhex('1901'),
+                                        #     bytes.fromhex(DOMAIN_SEPARATOR[2:]),
+                                        #     bytes.fromhex(action_hash.hex()[2:])
+                                        # ])
+
+    typed_data_hash = w3.keccak(hexstr=encoded_typed_data_hash)
     
     print('Typed data hash:', typed_data_hash.hex())
 
@@ -110,7 +124,7 @@ def sign_order(order):
         text=typed_data_hash.hex(),
     )
 
-    order['signature'] = w3.eth.account.sign_message(msg, private_key=PRIVATE_KEY).signature.hex()
+    order['signature'] = account.signHash(typed_data_hash).signature.hex()
     return order
 
 
