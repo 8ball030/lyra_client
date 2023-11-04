@@ -12,6 +12,7 @@ from enum import Enum
 import eth_abi
 import requests
 from eth_account.messages import encode_defunct
+from pprint import pprint
 from web3 import Web3
 
 BASE_URL = "https://api-demo.lyra.finance"
@@ -23,9 +24,11 @@ DOMAIN_SEPARATOR = '0xff2ba7c8d1c63329d3c2c6c9c19113440c004c51fe6413f65654962afa
 ASSET_ADDRESS = '0x8932cc48F7AD0c6c7974606cFD7bCeE2F543a124'
 TRADE_MODULE_ADDRESS = '0x63Bc9D10f088eddc39A6c40Ff81E99516dfD5269'
 
-OPTION_NAME = 'ETH-20231027-1500-P'
+OPTION_NAME = 'ETH-PERP'
 OPTION_SUB_ID = '644245094401698393600'
 
+
+subaccount_id = 550
 
 class InstrumentType(Enum):
     ERC20 = "erc20"
@@ -141,6 +144,7 @@ class LyraClient:
         headers = self._create_signature_headers()
         response = requests.post(url, json=payload, headers=headers)
         results = json.loads(response.content)["result"]
+        breakpoint()
         return results
 
     def create_order(
@@ -161,10 +165,9 @@ class LyraClient:
         endpoint = "order"
         url = f"{BASE_URL}/private/{endpoint}"
 
-        order = self.__define_order(
-            OPTION_NAME=instrument_name,
-            subaccount_id="",
-        )
+        order = self.__define_order()
+        print(f"Raw order;")
+        pprint(order)
         encoded_order = self.__encode_order(order)
         signed_order = self.__sign_order(encoded_order)
         print(url, signed_order)
@@ -229,10 +232,45 @@ class LyraClient:
         }
 
         response = requests.post(url, json=payload, headers=headers)
-
         print(response.text)
+
+    def __define_order(
+        self,
+    ):
+        """
+        Define the order
+        """
+        signature_expiry_sec = int(time.time()) + (60 * 60 * 24 * 7)
+        return {
+            "instrument_name": OPTION_NAME,
+            "subaccount_id": subaccount_id,
+            "direction": "buy",
+            "limit_price": 1310,
+            "amount": 100,
+            "signature_expiry_sec": signature_expiry_sec,
+            "max_fee": "0.01",
+            "nonce": f"{int(time.time())}",
+            "signer": self.wallet.address,
+            "order_type": "limit",
+            "mmp": False,
+            "signature": "filled in later",
+        }
 
 
 def main():
     """Execute the main function."""
-    print("Hello")
+    from tests.test_main import TEST_PRIVATE_KEY
+    client = LyraClient(TEST_PRIVATE_KEY)
+    client.create_order(
+        instrument_name="ETH-PERP",
+        price=1310,
+        amount=100,
+
+
+    )
+
+
+
+if __name__ == "__main__":
+    main()
+

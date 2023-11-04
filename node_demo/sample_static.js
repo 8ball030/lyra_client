@@ -13,15 +13,15 @@ const PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY
 const PROVIDER_URL = 'https://l2-prod-testnet-0eakp60405.t.conduit.xyz';
 const WS_ADDRESS = process.env.WEBSOCKET_ADDRESS || 'ws://localhost:3000/ws';
 const ACTION_TYPEHASH = '0x4d7a9f27c403ff9c0f19bce61d76d82f9aa29f8d6d4b0c5474607d9770d1af17';
-const DOMAIN_SEPARATOR = '0x9bcf4dc06df5d8bf23af818d5716491b995020f377d3b7b64c29ed14e3dd1105';
+const DOMAIN_SEPARATOR = '0xff2ba7c8d1c63329d3c2c6c9c19113440c004c51fe6413f65654962afaff00f3';
 // const ASSET_ADDRESS = '0x8932cc48F7AD0c6c7974606cFD7bCeE2F543a124';
-const ASSET_ADDRESS = '0x6caf294DaC985ff653d5aE75b4FF8E0A66025928';
-const TRADE_MODULE_ADDRESS = '0x87F2863866D85E3192a35A73b388BD625D83f2be';
+const ASSET_ADDRESS = '0x62CF2Cc6450Dc3FbD0662Bfd69af0a4D7485Fe4E';
+const TRADE_MODULE_ADDRESS = '0x63Bc9D10f088eddc39A6c40Ff81E99516dfD5269';
 
 const PROVIDER = new ethers.JsonRpcProvider(PROVIDER_URL);
 const wallet = new ethers.Wallet(PRIVATE_KEY, PROVIDER);
 const encoder = ethers.AbiCoder.defaultAbiCoder();
-const subaccount_id = 5
+const subaccount_id = 550
 
 const OPTION_NAME = 'ETH-PERP'
 const OPTION_SUB_ID = '0' // can retreive with public/get_instrument
@@ -74,9 +74,11 @@ function defineOrder(){
         direction: "buy",
         limit_price: 1310,
         amount: 100,
-        signature_expiry_sec: Math.floor(Date.now() / 1000 + 300),
+        signature_expiry_sec: 1698956141 + 3000,
+        // signature_expiry_sec: Math.floor(Date.now() / 1000 + 300),
         max_fee: "0.01",
-        nonce: Number(`${Date.now()}${Math.round(Math.random() * 999)}`), // LYRA nonce format: ${CURRENT UTC MS +/- 1 day}${RANDOM 3 DIGIT NUMBER}
+        nonce: Number(`1698956141` + 997), // LYRA nonce format: ${CURRENT UTC MS +/- 1 day}${RANDOM 3 DIGIT NUMBER}
+        // nonce: Number(`${Date.now()}${Math.round(Math.random() * 999)}`), // LYRA nonce format: ${CURRENT UTC MS +/- 1 day}${RANDOM 3 DIGIT NUMBER}
         signer: wallet.address,
         order_type: "limit",
         mmp: false,
@@ -95,12 +97,15 @@ function encodeTradeData(order){
       ethers.parseUnits(order.max_fee.toString(), 18), 
       order.subaccount_id, order.direction === 'buy']
     );
+
+  console.log('Encoded trade data:', encoded_data);
   return ethers.keccak256(Buffer.from(encoded_data.slice(2), 'hex')) // same as "encoded_data_hashed" in public/order_debug
 }
 
 async function signOrder(order) {
     const tradeModuleData = encodeTradeData(order)
 
+    console.log('Signing trade module data:', tradeModuleData);
     const action_hash = ethers.keccak256(
         encoder.encode(
           ['bytes32', 'uint256', 'uint256', 'address', 'bytes32', 'uint256', 'address', 'address'], 
@@ -117,13 +122,25 @@ async function signOrder(order) {
         )
     ); // same as "action_hash" in public/order_debug
 
-    order.signature = wallet.signingKey.sign(
-        ethers.keccak256(Buffer.concat([
+    console.log('Signing action hash:', action_hash);
+    typed_data_hash = ethers.keccak256(Buffer.concat([
           Buffer.from("1901", "hex"), 
           Buffer.from(DOMAIN_SEPARATOR.slice(2), "hex"), 
           Buffer.from(action_hash.slice(2), "hex")
         ]))  // same as "typed_data_hash" in public/order_debug
-    ).serialized;
+    
+    console.log('Typed data hash:', typed_data_hash);
+
+    order.signature = wallet.signingKey.sign(typed_data_hash).serialized;
+    //     ethers.keccak256(Buffer.concat([
+    //       Buffer.from("1901", "hex"), 
+    //       Buffer.from(DOMAIN_SEPARATOR.slice(2), "hex"), 
+    //       Buffer.from(action_hash.slice(2), "hex")
+    //     ]))  // same as "typed_data_hash" in public/order_debug
+    // ).serialized;
+
+
+
 }
 
 async function submitOrder(order, ws) {
