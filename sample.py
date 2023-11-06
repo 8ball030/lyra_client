@@ -23,12 +23,12 @@ TRADE_MODULE_ADDRESS = '0x63Bc9D10f088eddc39A6c40Ff81E99516dfD5269'
 
 ACTION_TYPEHASH = '0x4d7a9f27c403ff9c0f19bce61d76d82f9aa29f8d6d4b0c5474607d9770d1af17'
 DOMAIN_SEPARATOR = '0x9bcf4dc06df5d8bf23af818d5716491b995020f377d3b7b64c29ed14e3dd1105'
-ASSET_ADDRESS = '0x6caf294DaC985ff653d5aE75b4FF8E0A66025928'
+ASSET_ADDRESS = '0x010e26422790C6Cb3872330980FAa7628FD20294'
 TRADE_MODULE_ADDRESS = '0x87F2863866D85E3192a35A73b388BD625D83f2be'
 
 w3 = Web3(Web3.HTTPProvider(PROVIDER_URL))
 account = w3.eth.account.from_key(PRIVATE_KEY)
-subaccount_id = 550
+subaccount_id = 5
 
 OPTION_NAME = 'ETH-PERP'
 OPTION_SUB_ID = '0'  # can retrieve with public/get_instrument
@@ -65,7 +65,7 @@ def login_client(ws):
 def define_order():
 
     ts = int(datetime.now().timestamp() * 1000) 
-    ts = 1698956141
+    # ts = 1698956141
 
     return {
         'instrument_name': OPTION_NAME,
@@ -75,8 +75,7 @@ def define_order():
         'amount': 100,
         'signature_expiry_sec': int(ts ) + 3000,
         'max_fee': '0.01',
-        # 'nonce': int(f"{int(ts)}{random.randint(100, 999)}"),
-        'nonce': int(f"{int(ts)}{997}"),
+        'nonce': int(f"{int(ts)}{random.randint(100, 999)}"),
         'signer': account.address,
         'order_type': 'limit',
         'mmp': False,
@@ -118,10 +117,6 @@ def sign_order(order):
 
 
     encoded_typed_data_hash = "".join(['0x1901', DOMAIN_SEPARATOR[2:], action_hash.hex()[2:]])
-                                        # [   bytes.fromhex('1901'),
-                                        #     bytes.fromhex(DOMAIN_SEPARATOR[2:]),
-                                        #     bytes.fromhex(action_hash.hex()[2:])
-                                        # ])
 
     typed_data_hash = w3.keccak(hexstr=encoded_typed_data_hash)
     
