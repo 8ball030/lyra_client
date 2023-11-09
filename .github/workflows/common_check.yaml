@@ -50,7 +50,7 @@ jobs:
 
       - name: Tests
         run: |
-          poetry run adev -v test -p .
+          poetry run make tests
 
       - name: Doc Tests
         run: |
