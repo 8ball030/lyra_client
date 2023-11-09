@@ -11,12 +11,17 @@ python = ">=3.8.1,<4.0"
 requests = "^2.31.0"
 pytest = "^7.4.2"
 web3 = "^6.11.1"
-eth-tester = "^0.9.1b1"
 black = "^23.10.1"
 isort = "^5.12.0"
 flake8 = "^6.1.0"
 websocket-client = "^1.6.4"
 setuptools = "^68.2.2"
+rich-click = "^1.7.1"
+python-dotenv = ">=0.14.0,<0.18.0"
+
+
+[tool.poetry.scripts]
+lyra= "lyra.cli:cli"
 
 
 [build-system]
