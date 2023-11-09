@@ -64,7 +64,7 @@ def login_client(ws):
 
 def define_order():
 
-    ts = int(datetime.now().timestamp() * 1000) 
+    ts = int(datetime.now().timestamp() * 1000)
     # ts = 1698956141
 
     return {
@@ -74,7 +74,7 @@ def define_order():
         'limit_price': 1310,
         'amount': 100,
         'signature_expiry_sec': int(ts ) + 3000,
-        'max_fee': '0.01',
+        'max_fee': '10.01',
         'nonce': int(f"{int(ts)}{random.randint(100, 999)}"),
         'signer': account.address,
         'order_type': 'limit',
@@ -119,7 +119,7 @@ def sign_order(order):
     encoded_typed_data_hash = "".join(['0x1901', DOMAIN_SEPARATOR[2:], action_hash.hex()[2:]])
 
     typed_data_hash = w3.keccak(hexstr=encoded_typed_data_hash)
-    
+
     print('Typed data hash:', typed_data_hash.hex())
 
     msg = encode_defunct(
