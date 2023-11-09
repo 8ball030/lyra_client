@@ -13,15 +13,22 @@ from tests.test_main import TEST_PRIVATE_KEY, TEST_WALLET
 PRIVATE_KEY = TEST_PRIVATE_KEY
 PROVIDER_URL = 'https://l2-prod-testnet-0eakp60405.t.conduit.xyz'
 WS_ADDRESS = "wss://api-demo.lyra.finance/ws"
+# old working addresses
 ACTION_TYPEHASH = '0x4d7a9f27c403ff9c0f19bce61d76d82f9aa29f8d6d4b0c5474607d9770d1af17'
 DOMAIN_SEPARATOR = '0xff2ba7c8d1c63329d3c2c6c9c19113440c004c51fe6413f65654962afaff00f3'
 # ASSET_ADDRESS = '0x8932cc48F7AD0c6c7974606cFD7bCeE2F543a124'
 ASSET_ADDRESS = '0x62CF2Cc6450Dc3FbD0662Bfd69af0a4D7485Fe4E'
 TRADE_MODULE_ADDRESS = '0x63Bc9D10f088eddc39A6c40Ff81E99516dfD5269'
+# NEW addresses
+
+ACTION_TYPEHASH = '0x4d7a9f27c403ff9c0f19bce61d76d82f9aa29f8d6d4b0c5474607d9770d1af17'
+DOMAIN_SEPARATOR = '0x9bcf4dc06df5d8bf23af818d5716491b995020f377d3b7b64c29ed14e3dd1105'
+ASSET_ADDRESS = '0x010e26422790C6Cb3872330980FAa7628FD20294'
+TRADE_MODULE_ADDRESS = '0x87F2863866D85E3192a35A73b388BD625D83f2be'
 
 w3 = Web3(Web3.HTTPProvider(PROVIDER_URL))
 account = w3.eth.account.from_key(PRIVATE_KEY)
-subaccount_id = 550
+subaccount_id = 5
 
 OPTION_NAME = 'ETH-PERP'
 OPTION_SUB_ID = '0'  # can retrieve with public/get_instrument
@@ -56,10 +63,7 @@ def login_client(ws):
 
 
 def define_order():
-
-    ts = int(datetime.now().timestamp() * 1000) 
-    ts = 1698956141
-
+    ts = int(datetime.now().timestamp() * 1000)
     return {
         'instrument_name': OPTION_NAME,
         'subaccount_id': subaccount_id,
@@ -67,9 +71,8 @@ def define_order():
         'limit_price': 1310,
         'amount': 100,
         'signature_expiry_sec': int(ts ) + 3000,
-        'max_fee': '0.01',
-        # 'nonce': int(f"{int(ts)}{random.randint(100, 999)}"),
-        'nonce': int(f"{int(ts)}{997}"),
+        'max_fee': '10.01',
+        'nonce': int(f"{int(ts)}{random.randint(100, 999)}"),
         'signer': account.address,
         'order_type': 'limit',
         'mmp': False,
@@ -109,20 +112,11 @@ def sign_order(order):
 
     print('Signing Action hash:', action_hash.hex())
 
-
     encoded_typed_data_hash = "".join(['0x1901', DOMAIN_SEPARATOR[2:], action_hash.hex()[2:]])
-                                        # [   bytes.fromhex('1901'),
-                                        #     bytes.fromhex(DOMAIN_SEPARATOR[2:]),
-                                        #     bytes.fromhex(action_hash.hex()[2:])
-                                        # ])
 
     typed_data_hash = w3.keccak(hexstr=encoded_typed_data_hash)
-    
-    print('Typed data hash:', typed_data_hash.hex())
 
-    msg = encode_defunct(
-        text=typed_data_hash.hex(),
-    )
+    print('Typed data hash:', typed_data_hash.hex())
 
     order['signature'] = account.signHash(typed_data_hash).signature.hex()
     return order
@@ -142,7 +136,7 @@ def submit_order(order, ws):
         message = json.loads(ws.recv())
         if message['id'] == id:
             print('Got order response:', message)
-            break
+            return message
 
 
 def complete_order():
