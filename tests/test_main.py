@@ -2,7 +2,8 @@
 Tests for the main function.
 """
 import pytest
-
+import time
+import itertools
 from lyra.main import InstrumentType, LyraClient, OrderSide, OrderType, UnderlyingCurrency, main
 
 TEST_WALLET = "0x3A5c777edf22107d7FdFB3B02B0Cdfe8b75f3453"
@@ -51,6 +52,34 @@ def test_fetch_subaccounts(lyra_client):
     breakpoint()
     assert accounts['subaccounts']
 
+
+
+def test_build_register_session_key_tx(lyra_client):
+    """Test build_register_session_key_tx"""
+
+    expiry_sec = str(int(time.time() * 1000) + 1000)
+    tx = lyra_client.build_register_session_key_tx(expiry_sec)
+    assert tx["tx_params"]
+
+
+def test_register_session_key(lyra_client):
+    """Test build_register_session_key_tx"""
+
+    expiry_sec = str(int(time.time() * 1000) + 1000)
+    tx = lyra_client.build_register_session_key_tx(expiry_sec)
+    tx_receipt = lyra_client.register_session_key(tx["tx_params"], expiry_sec)
+    assert tx_receipt["transaction_id"]
+
+
+@pytest.mark.parametrize(
+    "currency, expired, instrument_type",
+    itertools.product(UnderlyingCurrency, [True, False], InstrumentType)
+)
+def test_get_instruments(lyra_client, currency, expired, instrument_type):
+    """Test get_instruments"""
+
+    instruments = lyra_client.get_instruments(currency, expired, instrument_type)
+    assert instruments
 
 
 def test_create_order(lyra_client):

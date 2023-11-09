@@ -56,8 +56,8 @@ class TimeInForce(Enum):
 
 
 
-
-w3 = Web3()
+CHAIN_ID = 901
+w3 = Web3(Web3.HTTPProvider(BASE_URL))
 
 
 def to_32byte_hex(val):
@@ -103,6 +103,67 @@ class LyraClient:
         if "error" in result_code:
             raise Exception(result_code["error"])
         return True
+
+    def build_register_session_key_tx(self, expiry_sec: int):
+        """Build register session key transaction."""
+
+        endpoint = "build_register_session_key_tx"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "expiry_sec": str(expiry_sec),
+            "wallet": self.wallet.address,
+            "gas": "0",
+            "nonce": "0",
+            "public_session_key": self.wallet.address,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+        result = json.loads(response.content)["result"]
+        return result
+
+    def register_session_key(self, tx_params: dict, expiry_sec: int):
+        """Register session key"""
+
+        tx_params.pop("gasLimit", None)
+        signed_tx = self.wallet.sign_transaction(tx_params)
+        endpoint = "register_session_key"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "expiry_sec": str(expiry_sec),
+            "label": self.wallet.address[:16],
+            "signed_raw_tx": signed_tx.rawTransaction.hex(),
+            "public_session_key": self.wallet.address,
+            "wallet": self.wallet.address,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+
+        result = json.loads(response.content)["result"]
+        return result
+
+    def get_instruments(self, currency: UnderlyingCurrency, expired: bool, intrument_type: InstrumentType):
+        """Get instruments."""
+
+        endpoint = "get_instruments"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "currency": currency.value.upper(),
+            "expired": expired,
+            "instrument_type": intrument_type.value,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+        result = json.loads(response.content)["result"]
+        return result
 
     def fetch_tickers(
         self,
