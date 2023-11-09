@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from rich.progress import track
 
-from rysk_client.src.utils import get_logger
+from lyra.utils import get_logger
 
 logger = get_logger()
 
