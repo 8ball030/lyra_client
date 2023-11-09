@@ -4,6 +4,7 @@ Lyra is a Python library for trading on lyra v2
 import json
 import time
 from enum import Enum
+import hashlib
 
 # we need to encode the abi for the contract
 # const encoder = ethers.AbiCoder.defaultAbiCoder();
@@ -88,7 +89,6 @@ class LyraBaseClient:
 class PublicAPI(LyraBaseClient):
     """Public API methods for the Lyra dex."""
 
-
     def create_account(self, wallet):
         """Call the create account endpoint."""
         endpoint = "create_account"
@@ -148,6 +148,55 @@ class PublicAPI(LyraBaseClient):
         result = json.loads(response.content)["result"]
         return result
 
+    def deregister_session_key(self, tx_params: dict):
+        """Deregister session key"""
+        raise NotImplementedError()
+
+    def generate_signature(self, message):
+        message = message.encode('utf-8')
+        message_hash = hashlib.sha256(message).digest()
+        signed_message = self.wallet.signHash(message_hash)
+        return signed_message.signature.hex()
+
+    def login(self):
+        """Login."""
+
+        timestamp = str(int(time.time() * 1000))
+        signature = self.generate_signature(timestamp)
+        endpoint = "login"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "signature": signature,
+            "wallet": self.wallet.address,
+            "gas": "0",
+            "nonce": "0",
+            "timestamp": timestamp,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+        # TODO: Here we get a 404
+        result = json.loads(response.content)["result"]
+        return result
+
+    def get_instrument(self, instrument_name: str):
+        """Get instrument."""
+
+        endpoint = "get_instrument"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "instrument_name": instrument_name,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+        result = json.loads(response.content)["result"]
+        return result
+
     def get_instruments(self, currency: UnderlyingCurrency, expired: bool, intrument_type: InstrumentType):
         """Get instruments."""
 
@@ -192,6 +241,86 @@ class PublicAPI(LyraBaseClient):
 
         results = json.loads(response.content)["result"]
         return results
+
+    def get_latest_signed_feeds(self, currency: UnderlyingCurrency):
+        """Get latest signed feeds"""
+
+        endpoint = "get_latest_signed_feeds"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "currency": currency.value.upper(),
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+        result = json.loads(response.content)["result"]
+        return result
+
+    def get_spot_feed_history(
+        self,
+        currency: UnderlyingCurrency,
+        start_timestamp: int,
+        end_timestamp: int,
+        period: int,
+    ):
+        """Get spot feed history"""
+
+        endpoint = "get_spot_feed_history"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "currency": currency.value.upper(),
+            "start_timestamp": start_timestamp,
+            "end_timestamp": end_timestamp,
+            "period": period,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+        # TODO: This doesn't work because we get we get HTML returned
+        result = json.loads(response.content)["result"]
+        return result
+
+    def get_transaction(self, transaction_id: str):
+        """Get transaction"""
+
+        endpoint = "get_transaction"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "transaction_id": transaction_id,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+
+        result = json.loads(response.content)["result"]
+        return result
+
+    def get_margin(self, transaction_id: str):
+        """Get margin"""
+
+        endpoint = "get_margin"
+        url = f"{BASE_URL}/public/{endpoint}"
+        payload = {
+            "transaction_id": transaction_id,
+        }
+        response = requests.post(
+            headers=PUBLIC_HEADERS,
+            url=url,
+            json=payload,
+        )
+
+        result = json.loads(response.content)["result"]
+        return result
+
+    def create_subaccount_debug(self):
+        """Create subaccount debug"""
+        raise NotADirectoryError()
 
 
 class PrivateAPI(LyraBaseClient):
