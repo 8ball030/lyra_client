@@ -1,6 +1,6 @@
 .PHONY: tests
 tests:
-	pytest tests -vv
+	poetry run pytest tests -vv
 
 fmt:
 	poetry run black tests lyra 

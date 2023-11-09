@@ -46,8 +46,7 @@ jobs:
 
       - name: Lint
         run: |
-          poetry run adev lint -p tests
-          poetry run adev lint -p rysk_client
+          poetry run make lint
 
       - name: Tests
         run: |
