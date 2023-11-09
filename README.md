@@ -2,6 +2,13 @@
 
 This repo provides a unified interface for the Lyra V2 Exchange.
 
+
+## Install
+
+```bash
+pip install lyra-client
+```
+
 ## Dev
 
 ### Formatting
