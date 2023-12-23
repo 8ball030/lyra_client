@@ -63,10 +63,7 @@ def login_client(ws):
 
 
 def define_order():
-
     ts = int(datetime.now().timestamp() * 1000)
-    # ts = 1698956141
-
     return {
         'instrument_name': OPTION_NAME,
         'subaccount_id': subaccount_id,
@@ -115,16 +112,11 @@ def sign_order(order):
 
     print('Signing Action hash:', action_hash.hex())
 
-
     encoded_typed_data_hash = "".join(['0x1901', DOMAIN_SEPARATOR[2:], action_hash.hex()[2:]])
 
     typed_data_hash = w3.keccak(hexstr=encoded_typed_data_hash)
 
     print('Typed data hash:', typed_data_hash.hex())
-
-    msg = encode_defunct(
-        text=typed_data_hash.hex(),
-    )
 
     order['signature'] = account.signHash(typed_data_hash).signature.hex()
     return order
@@ -144,7 +136,7 @@ def submit_order(order, ws):
         message = json.loads(ws.recv())
         if message['id'] == id:
             print('Got order response:', message)
-            break
+            return message
 
 
 def complete_order():

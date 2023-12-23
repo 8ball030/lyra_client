@@ -1,6 +1,6 @@
 .PHONY: tests
 tests:
-	pytest tests -vv
+	poetry run pytest tests -vv
 
 fmt:
 	poetry run black tests lyra 
@@ -10,3 +10,6 @@ lint:
 	poetry run flake8 tests lyra
 
 all: fmt lint tests
+
+test-docs:
+	echo making docs
