@@ -82,7 +82,7 @@ class LyraClient:
 
     def fetch_instruments(
         self,
-        expired=True,
+        expired=False,
         instrument_type: InstrumentType = InstrumentType.PERP,
         currency: UnderlyingCurrency = UnderlyingCurrency.BTC,
     ):
@@ -261,18 +261,13 @@ class LyraClient:
         order['signature'] = self.wallet.signHash(typed_data_hash).signature.hex()
         return order
 
-
-def main():
-    """Execute the main function."""
-    from tests.test_main import TEST_PRIVATE_KEY
-
-    client = LyraClient(TEST_PRIVATE_KEY)
-    client.create_order(
-        instrument_name="ETH-PERP",
-        price=1310,
-        amount=100,
-    )
-
-
-if __name__ == "__main__":
-    main()
+    def fetch_ticker(self, instrument_name):
+        """
+        Fetch the ticker for a given instrument name.
+        """
+        url = f"{BASE_URL}/public/get_ticker"
+        payload = {"instrument_name": instrument_name}
+        headers = {"accept": "application/json", "content-type": "application/json"}
+        response = requests.post(url, json=payload, headers=headers)
+        results = json.loads(response.content)["result"]
+        return results

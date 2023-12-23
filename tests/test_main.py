@@ -58,16 +58,31 @@ def test_create_order(lyra_client):
     """
     Test the LyraClient class.
     """
-    assert "error" not in lyra_client.create_order(
+    result = lyra_client.create_order(
         price=200,
         amount=1,
         instrument_name="ETH-PERP",
         side=OrderSide.BUY,
         order_type=OrderType.LIMIT,
     )
+    assert "error" not in result
 
 
-def test_define_order(lyra_client):
+def test_fetch_ticker(lyra_client):
     """
     Test the LyraClient class.
     """
+    instruments = lyra_client.fetch_instruments(instrument_type=InstrumentType.PERP)
+    instrument_name = instruments[0]['instrument_name']
+    ticker = lyra_client.fetch_ticker(instrument_name=instrument_name)
+    assert ticker['instrument_name'] == instrument_name
+
+
+def test_fetch_option_tickers(lyra_client):
+    """
+    Test the LyraClient class.
+    """
+    instruments = lyra_client.fetch_instruments(instrument_type=InstrumentType.OPTION, expired=False)
+    instrument_name = instruments[0]['instrument_name']
+    ticker = lyra_client.fetch_ticker(instrument_name=instrument_name)
+    assert ticker['instrument_name'] == instrument_name

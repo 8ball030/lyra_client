@@ -65,6 +65,11 @@ def instruments():
     """Interact with markets."""
 
 
+@cli.group("tickers")
+def tickers():
+    """Interact with tickers."""
+
+
 @instruments.command("fetch")
 @click.pass_context
 @click.option(
@@ -78,6 +83,20 @@ def fetch_instruments(ctx, instrument_type):
     client = ctx.obj["client"]
     markets = client.fetch_instruments(instrument_type=InstrumentType(instrument_type))
     print(markets)
+
+
+# we pass the instrument_name as a parameter
+@tickers.command("fetch")
+@click.pass_context
+@click.argument(
+    "instrument_name",
+    type=str,
+)
+def fetch_tickers(ctx, instrument_name):
+    """Fetch tickers."""
+    client = ctx.obj["client"]
+    ticker = client.fetch_ticker(instrument_name=instrument_name)
+    print(ticker)
 
 
 if __name__ == "__main__":
