@@ -1,6 +1,8 @@
 """
 Tests for the main function.
 """
+from itertools import product
+
 import pytest
 
 from lyra.enums import Environment, InstrumentType, OrderSide, OrderType, UnderlyingCurrency
@@ -23,12 +25,18 @@ def test_lyra_client(lyra_client):
     assert lyra_client.create_account(TEST_WALLET)
 
 
-def test_lyra_client_fetch_tickers(lyra_client):
+@pytest.mark.parametrize(
+    "instrument_type, currency",
+    product(
+        [InstrumentType.PERP, InstrumentType.OPTION],
+        [UnderlyingCurrency.BTC],
+    ),
+)
+def test_lyra_client_fetch_instruments(lyra_client, instrument_type, currency):
     """
     Test the LyraClient class.
     """
-    res = lyra_client.fetch_tickers(instrument_type=InstrumentType.PERP.value, currency=UnderlyingCurrency.ETH.value)
-    assert res
+    assert lyra_client.fetch_instruments(instrument_type=instrument_type, currency=currency)
 
 
 def test_create_signature_headers(lyra_client):

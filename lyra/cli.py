@@ -5,8 +5,9 @@ import os
 
 import rich_click as click
 from dotenv import load_dotenv
+from rich import print
 
-from lyra.enums import Environment
+from lyra.enums import Environment, InstrumentType
 from lyra.lyra import LyraClient
 from lyra.utils import get_logger
 
@@ -39,9 +40,7 @@ def set_client(ctx):
         else:
             env = Environment.TEST
         ctx.client = LyraClient(**auth, env=env)
-        breakpoint()
-        if not ctx.client.web3_client.isConnected():
-            raise ConnectionError("Web3 client not connected.")
+    print(f"Client created for environment `{ctx.client.env.value}`")
     return ctx.client
 
 
@@ -61,15 +60,25 @@ def cli(ctx, log_level):
     ctx.obj["client"] = set_client(ctx)
 
 
-@cli.group("markets")
-def markets():
+@cli.group("instruments")
+def instruments():
     """Interact with markets."""
 
 
-@markets.command("fetch")
+@instruments.command("fetch")
 @click.pass_context
-def fetch_markets(ctx):
+@click.option(
+    "--instrument-type",
+    "-i",
+    type=click.Choice([f.value for f in InstrumentType]),
+    default=InstrumentType.PERP.value,
+)
+def fetch_instruments(ctx, instrument_type):
     """Fetch markets."""
     client = ctx.obj["client"]
-    markets = client.fetch_markets()
-    click.echo(markets)
+    markets = client.fetch_instruments(instrument_type=InstrumentType(instrument_type))
+    print(markets)
+
+
+if __name__ == "__main__":
+    cli()  # pylint: disable=no-value-for-parameter
