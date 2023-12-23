@@ -12,7 +12,8 @@ from eth_account.messages import encode_defunct
 from web3 import Web3
 from websocket import create_connection
 
-from lyra.enums import InstrumentType, OrderSide, OrderType, TimeInForce
+from lyra.enums import InstrumentType, OrderSide, OrderType, TimeInForce, UnderlyingCurrency
+from lyra.utils import get_logger
 
 BASE_URL = "https://api-demo.lyra.finance"
 
@@ -53,13 +54,13 @@ class LyraClient:
             "X-LyraSignature": Web3.to_hex(signature.signature),
         }
 
-    def __init__(self, private_key, logger, env, verbose=False):
+    def __init__(self, private_key, env, logger=None, verbose=False):
         """
         Initialize the LyraClient class.
         """
-        self.logger = logger
         self.verbose = verbose
         self.env = env
+        self.logger = logger or get_logger()
         self.web3_client = Web3()
         self.wallet = self.web3_client.eth.account.from_key(private_key)
 
@@ -79,31 +80,26 @@ class LyraClient:
             raise Exception(result_code["error"])
         return True
 
-    def fetch_tickers(
+    def fetch_instruments(
         self,
         expired=True,
-        instrument_type="erc20",
-        page=1,
-        page_size=20,
-        currency="eth",
+        instrument_type: InstrumentType = InstrumentType.PERP,
+        currency: UnderlyingCurrency = UnderlyingCurrency.BTC,
     ):
-        """Return the tickers"""
-        if instrument_type.upper() not in InstrumentType.__members__:
-            raise Exception(f"Invalid instrument type {instrument_type}")
-        endpoint = "get_tickers"
-        url = f"{BASE_URL}/public/{endpoint}"
+        """
+        Return the tickers.
+        First fetch all instrucments
+        Then get the ticket for all instruments.
+        """
+        url = f"{BASE_URL}/public/get_instruments"
         payload = {
             "expired": expired,
-            "instrument_type": instrument_type,
-            "page": page,
-            "page_size": page_size,
-            "currency": currency.upper(),
+            "instrument_type": instrument_type.value,
+            "currency": currency.name,
         }
         headers = {"accept": "application/json", "content-type": "application/json"}
-
         response = requests.post(url, json=payload, headers=headers)
-
-        results = json.loads(response.content)["result"]
+        results = response.json()["result"]
         return results
 
     def fetch_subaccounts(self, wallet):
@@ -245,7 +241,6 @@ class LyraClient:
 
     def _sign_order(self, order):
         trade_module_data = self._encode_trade_data(order)
-        print('Signing Trade module data:', trade_module_data.hex())
         encoded_action_hash = eth_abi.encode(
             ['bytes32', 'uint256', 'uint256', 'address', 'bytes32', 'uint256', 'address', 'address'],
             [
@@ -261,10 +256,8 @@ class LyraClient:
         )
 
         action_hash = self.web3_client.keccak(encoded_action_hash)
-        print('Signing Action hash:', action_hash.hex())
         encoded_typed_data_hash = "".join(['0x1901', DOMAIN_SEPARATOR[2:], action_hash.hex()[2:]])
         typed_data_hash = self.web3_client.keccak(hexstr=encoded_typed_data_hash)
-        print('Typed data hash:', typed_data_hash.hex())
         order['signature'] = self.wallet.signHash(typed_data_hash).signature.hex()
         return order
 
