@@ -52,7 +52,6 @@ def test_fetch_subaccounts(lyra_client):
     assert accounts['subaccounts']
 
 
-
 def test_create_order(lyra_client):
     """
     Test the LyraClient class.

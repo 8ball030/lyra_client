@@ -4,6 +4,7 @@ Lyra is a Python library for trading on lyra v2
 import json
 import time
 from enum import Enum
+from pprint import pprint
 
 # we need to encode the abi for the contract
 # const encoder = ethers.AbiCoder.defaultAbiCoder();
@@ -12,7 +13,6 @@ from enum import Enum
 import eth_abi
 import requests
 from eth_account.messages import encode_defunct
-from pprint import pprint
 from web3 import Web3
 
 BASE_URL = "https://api-demo.lyra.finance"
@@ -29,6 +29,7 @@ OPTION_SUB_ID = '644245094401698393600'
 
 
 subaccount_id = 550
+
 
 class InstrumentType(Enum):
     ERC20 = "erc20"
@@ -55,9 +56,6 @@ class TimeInForce(Enum):
     GTC = "gtc"
     IOC = "ioc"
     FOK = "fok"
-
-
-
 
 
 w3 = Web3()
@@ -204,10 +202,10 @@ class LyraClient:
 
     # private apis
     def create_subaccount(
-            amount,
-            asset_name,
-            currency="USDT",
-            margin_type="SM",
+        amount,
+        asset_name,
+        currency="USDT",
+        margin_type="SM",
     ):
         """
         Create a subaccount
@@ -224,12 +222,9 @@ class LyraClient:
             "signature": "string",
             "signature_expiry_sec": 0,
             "signer": "string",
-            "wallet": "string"
+            "wallet": "string",
         }
-        headers = {
-            "accept": "application/json",
-            "content-type": "application/json"
-        }
+        headers = {"accept": "application/json", "content-type": "application/json"}
 
         response = requests.post(url, json=payload, headers=headers)
         print(response.text)
@@ -260,17 +255,14 @@ class LyraClient:
 def main():
     """Execute the main function."""
     from tests.test_main import TEST_PRIVATE_KEY
+
     client = LyraClient(TEST_PRIVATE_KEY)
     client.create_order(
         instrument_name="ETH-PERP",
         price=1310,
         amount=100,
-
-
     )
-
 
 
 if __name__ == "__main__":
     main()
-
