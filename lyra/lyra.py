@@ -102,16 +102,27 @@ class LyraClient:
         results = response.json()["result"]
         return results
 
-    def fetch_subaccounts(self, wallet):
+    def fetch_subaccounts(self, wallet=None):
         """
         Returns the subaccounts for a given wallet
         """
         endpoint = "get_subaccounts"
         url = f"{BASE_URL}/private/{endpoint}"
-        payload = {"wallet": wallet}
+        payload = {"wallet": wallet if wallet else self.wallet.address}
         headers = self._create_signature_headers()
         response = requests.post(url, json=payload, headers=headers)
         results = json.loads(response.content)["result"]
+        return results
+
+    def fetch_subaccount(self, subaccount_id):
+        """
+        Returns information for a given subaccount
+        """
+        url = f"{BASE_URL}/private/get_subaccount"
+        payload = {"subaccount_id": subaccount_id}
+        headers = self._create_signature_headers()
+        response = requests.post(url, json=payload, headers=headers)
+        results = response.json()["result"]
         return results
 
     def create_order(

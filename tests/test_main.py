@@ -86,3 +86,12 @@ def test_fetch_option_tickers(lyra_client):
     instrument_name = instruments[0]['instrument_name']
     ticker = lyra_client.fetch_ticker(instrument_name=instrument_name)
     assert ticker['instrument_name'] == instrument_name
+
+
+def test_fetch_subaccount(lyra_client):
+    """
+    Test the LyraClient class.
+    """
+    subaccount_id = lyra_client.fetch_subaccounts()['subaccount_ids'][0]
+    subaccount = lyra_client.fetch_subaccount(subaccount_id)
+    assert subaccount['subaccount_id'] == subaccount_id

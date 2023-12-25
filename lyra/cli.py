@@ -70,6 +70,11 @@ def tickers():
     """Interact with tickers."""
 
 
+@cli.group("subaccounts")
+def subaccounts():
+    """Interact with subaccounts."""
+
+
 @instruments.command("fetch")
 @click.pass_context
 @click.option(
@@ -85,7 +90,6 @@ def fetch_instruments(ctx, instrument_type):
     print(markets)
 
 
-# we pass the instrument_name as a parameter
 @tickers.command("fetch")
 @click.pass_context
 @click.argument(
@@ -97,6 +101,30 @@ def fetch_tickers(ctx, instrument_name):
     client = ctx.obj["client"]
     ticker = client.fetch_ticker(instrument_name=instrument_name)
     print(ticker)
+
+
+@subaccounts.command("fetch")
+@click.pass_context
+def fetch_subaccounts(ctx):
+    """Fetch subaccounts."""
+    print("Fetching subaccounts")
+    client = ctx.obj["client"]
+    subaccounts = client.fetch_subaccounts()
+    print(subaccounts)
+
+
+@subaccounts.command("info")
+@click.pass_context
+@click.argument(
+    "subaccount_id",
+    type=int,
+)
+def fetch_subaccount(ctx, subaccount_id):
+    """Fetch subaccount."""
+    print("Fetching subaccount")
+    client = ctx.obj["client"]
+    subaccount = client.fetch_subaccount(subaccount_id=subaccount_id)
+    print(subaccount)
 
 
 if __name__ == "__main__":
