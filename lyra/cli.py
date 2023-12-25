@@ -7,7 +7,7 @@ import rich_click as click
 from dotenv import load_dotenv
 from rich import print
 
-from lyra.enums import Environment, InstrumentType
+from lyra.enums import Environment, InstrumentType, OrderStatus
 from lyra.lyra import LyraClient
 from lyra.utils import get_logger
 
@@ -75,6 +75,11 @@ def subaccounts():
     """Interact with subaccounts."""
 
 
+@cli.group("orders")
+def orders():
+    """Interact with orders."""
+
+
 @instruments.command("fetch")
 @click.pass_context
 @click.option(
@@ -125,6 +130,82 @@ def fetch_subaccount(ctx, subaccount_id):
     client = ctx.obj["client"]
     subaccount = client.fetch_subaccount(subaccount_id=subaccount_id)
     print(subaccount)
+
+
+@orders.command("fetch")
+@click.pass_context
+@click.option(
+    "--instrument-name",
+    "-i",
+    type=str,
+    default=None,
+)
+@click.option(
+    "--label",
+    "-l",
+    type=str,
+    default=None,
+)
+@click.option(
+    "--page",
+    "-p",
+    type=int,
+    default=1,
+)
+@click.option(
+    "--page-size",
+    "-s",
+    type=int,
+    default=100,
+)
+@click.option(
+    "--status",
+    "-s",
+    type=click.Choice([f.value for f in OrderStatus]),
+    default=None,
+)
+def fetch_orders(ctx, instrument_name, label, page, page_size, status):
+    """Fetch orders."""
+    print("Fetching orders")
+    client = ctx.obj["client"]
+    orders = client.fetch_orders(
+        instrument_name=instrument_name,
+        label=label,
+        page=page,
+        page_size=page_size,
+        status=status,
+    )
+    print(orders)
+
+
+@orders.command("cancel")
+@click.pass_context
+@click.option(
+    "--order-id",
+    "-o",
+    type=str,
+)
+@click.option(
+    "--instrument-name",
+    "-i",
+    type=str,
+)
+def cancel_order(ctx, order_id, instrument_name):
+    """Cancel order."""
+    print("Cancelling order")
+    client = ctx.obj["client"]
+    result = client.cancel(order_id=order_id, instrument_name=instrument_name)
+    print(result)
+
+
+@orders.command("cancel_all")
+@click.pass_context
+def cancel_all_orders(ctx):
+    """Cancel all orders."""
+    print("Cancelling all orders")
+    client = ctx.obj["client"]
+    result = client.cancel_all()
+    print(result)
 
 
 if __name__ == "__main__":

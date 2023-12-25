@@ -95,3 +95,49 @@ def test_fetch_subaccount(lyra_client):
     subaccount_id = lyra_client.fetch_subaccounts()['subaccount_ids'][0]
     subaccount = lyra_client.fetch_subaccount(subaccount_id)
     assert subaccount['subaccount_id'] == subaccount_id
+
+
+def test_fetch_orders(lyra_client):
+    """
+    Test the LyraClient class.
+    """
+    orders = lyra_client.fetch_orders()
+    assert orders
+
+
+def test_cancel_order(lyra_client):
+    """
+    Test the LyraClient class.
+    """
+    order = lyra_client.create_order(
+        price=200,
+        amount=1,
+        instrument_name="ETH-PERP",
+        side=OrderSide.BUY,
+        order_type=OrderType.LIMIT,
+    )
+    order_id = order['order_id']
+    result = lyra_client.cancel(instrument_name="ETH-PERP", order_id=order_id)
+    assert result['order_id'] == order_id
+
+
+def test_cancel_all_orders(lyra_client):
+    """Test all open orders are cancelled."""
+    lyra_client.create_order(
+        price=200,
+        amount=1,
+        instrument_name="ETH-PERP",
+        side=OrderSide.BUY,
+        order_type=OrderType.LIMIT,
+    )
+    open_orders = lyra_client.fetch_orders(status="open")
+    assert open_orders
+    lyra_client.cancel_all()
+    open_orders = lyra_client.fetch_orders(status="open")
+    assert not open_orders
+
+
+def test_get_positions(lyra_client):
+    """Test get positions."""
+    positions = lyra_client.get_positions()
+    assert isinstance(positions, list)

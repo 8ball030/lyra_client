@@ -34,6 +34,16 @@ class OrderType(Enum):
     MARKET = "market"
 
 
+class OrderStatus(Enum):
+    """Order statuses."""
+
+    OPEN = "open"
+    FILLED = "filled"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
+
+
 class TimeInForce(Enum):
     """Time in force."""
 
