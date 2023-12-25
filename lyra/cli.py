@@ -97,7 +97,9 @@ def orders():
 def fetch_instruments(ctx, instrument_type, currency):
     """Fetch markets."""
     client = ctx.obj["client"]
-    markets = client.fetch_instruments(instrument_type=InstrumentType(instrument_type), currency=UnderlyingCurrency(currency))
+    markets = client.fetch_instruments(
+        instrument_type=InstrumentType(instrument_type), currency=UnderlyingCurrency(currency)
+    )
     print(markets)
 
 
