@@ -12,24 +12,12 @@ from eth_account.messages import encode_defunct
 from web3 import Web3
 from websocket import create_connection
 
+from lyra.constants import CONTRACTS, PUBLIC_HEADERS
 from lyra.enums import InstrumentType, OrderSide, OrderStatus, OrderType, TimeInForce, UnderlyingCurrency
 from lyra.utils import get_logger
 
-BASE_URL = "https://api-demo.lyra.finance"
-
-PUBLIC_HEADERS = {"accept": "application/json", "content-type": "application/json"}
-
-ACTION_TYPEHASH = '0x4d7a9f27c403ff9c0f19bce61d76d82f9aa29f8d6d4b0c5474607d9770d1af17'
-DOMAIN_SEPARATOR = '0x9bcf4dc06df5d8bf23af818d5716491b995020f377d3b7b64c29ed14e3dd1105'
-ASSET_ADDRESS = '0x010e26422790C6Cb3872330980FAa7628FD20294'
-TRADE_MODULE_ADDRESS = '0x87F2863866D85E3192a35A73b388BD625D83f2be'
-
 OPTION_NAME = 'ETH-PERP'
 OPTION_SUB_ID = '0'
-
-WS_ADDRESS = "wss://api-demo.lyra.finance/ws"
-
-subaccount_id = 5
 
 
 def to_32byte_hex(val):
@@ -59,7 +47,7 @@ class LyraClient:
         Initialize the LyraClient class.
         """
         self.verbose = verbose
-        self.env = env
+        self.contracts = CONTRACTS[env]
         self.logger = logger or get_logger()
         self.web3_client = Web3()
         self.wallet = self.web3_client.eth.account.from_key(private_key)
@@ -68,9 +56,8 @@ class LyraClient:
 
     def create_account(self, wallet):
         """Call the create account endpoint."""
-        endpoint = "create_account"
         payload = {"wallet": wallet}
-        url = f"{BASE_URL}/public/{endpoint}"
+        url = f"{self.contracts['BASE_URL']}/public/create_account"
         result = requests.post(
             headers=PUBLIC_HEADERS,
             url=url,
@@ -93,7 +80,7 @@ class LyraClient:
         First fetch all instrucments
         Then get the ticket for all instruments.
         """
-        url = f"{BASE_URL}/public/get_instruments"
+        url = f"{self.contracts['BASE_URL']}/public/get_instruments"
         payload = {
             "expired": expired,
             "instrument_type": instrument_type.value,
@@ -108,8 +95,7 @@ class LyraClient:
         """
         Returns the subaccounts for a given wallet
         """
-        endpoint = "get_subaccounts"
-        url = f"{BASE_URL}/private/{endpoint}"
+        url = f"{self.contracts['BASE_URL']}/private/get_subaccounts"
         payload = {"wallet": wallet if wallet else self.wallet.address}
         headers = self._create_signature_headers()
         response = requests.post(url, json=payload, headers=headers)
@@ -120,8 +106,8 @@ class LyraClient:
         """
         Returns information for a given subaccount
         """
-        url = f"{BASE_URL}/private/get_subaccount"
-        payload = {"subaccount_id": subaccount_id}
+        url = f"{self.contracts['BASE_URL']}/private/get_subaccount"
+        payload = {"subaccount_id": self.subaccount_id}
         headers = self._create_signature_headers()
         response = requests.post(url, json=payload, headers=headers)
         results = response.json()["result"]
@@ -175,7 +161,7 @@ class LyraClient:
         }
 
     def connect_ws(self):
-        ws = create_connection(WS_ADDRESS)
+        ws = create_connection(self.contracts['WS_ADDRESS'])
         return ws
 
     def login_client(self, ws):
@@ -186,6 +172,7 @@ class LyraClient:
         time.sleep(1)
 
     def create_subaccount(
+        self,
         amount,
         asset_name,
         currency="USDT",
@@ -194,8 +181,7 @@ class LyraClient:
         """
         Create a subaccount
         """
-        endpoint = "create_subaccount"
-        url = f"{BASE_URL}/private/{endpoint}"
+        url = f"{self.contracts['BASE_URL']}/private/create_subaccount"
 
         payload = {
             "amount": "",
@@ -208,9 +194,7 @@ class LyraClient:
             "signer": "string",
             "wallet": "string",
         }
-        headers = {"accept": "application/json", "content-type": "application/json"}
-
-        response = requests.post(url, json=payload, headers=headers)
+        response = requests.post(url, json=payload, headers=PUBLIC_HEADERS)
         print(response.text)
 
     def _define_order(
@@ -222,7 +206,7 @@ class LyraClient:
         ts = int(datetime.now().timestamp() * 1000)
         return {
             'instrument_name': OPTION_NAME,
-            'subaccount_id': subaccount_id,
+            'subaccount_id': self.subaccount_id,
             'direction': 'buy',
             'limit_price': 1310,
             'amount': 100,
@@ -239,7 +223,7 @@ class LyraClient:
         encoded_data = eth_abi.encode(
             ['address', 'uint256', 'int256', 'int256', 'uint256', 'uint256', 'bool'],
             [
-                ASSET_ADDRESS,
+                self.contracts['ASSET_ADDRESS'],
                 int(OPTION_SUB_ID),
                 self.web3_client.to_wei(order['limit_price'], 'ether'),
                 self.web3_client.to_wei(order['amount'], 'ether'),
@@ -256,10 +240,10 @@ class LyraClient:
         encoded_action_hash = eth_abi.encode(
             ['bytes32', 'uint256', 'uint256', 'address', 'bytes32', 'uint256', 'address', 'address'],
             [
-                bytes.fromhex(ACTION_TYPEHASH[2:]),
+                bytes.fromhex(self.contracts['ACTION_TYPEHASH'][2:]),
                 order['subaccount_id'],
                 order['nonce'],
-                TRADE_MODULE_ADDRESS,
+                self.contracts['TRADE_MODULE_ADDRESS'],
                 trade_module_data,
                 order['signature_expiry_sec'],
                 self.wallet.address,
@@ -268,7 +252,7 @@ class LyraClient:
         )
 
         action_hash = self.web3_client.keccak(encoded_action_hash)
-        encoded_typed_data_hash = "".join(['0x1901', DOMAIN_SEPARATOR[2:], action_hash.hex()[2:]])
+        encoded_typed_data_hash = "".join(['0x1901', self.contracts['DOMAIN_SEPARATOR'][2:], action_hash.hex()[2:]])
         typed_data_hash = self.web3_client.keccak(hexstr=encoded_typed_data_hash)
         order['signature'] = self.wallet.signHash(typed_data_hash).signature.hex()
         return order
@@ -277,10 +261,9 @@ class LyraClient:
         """
         Fetch the ticker for a given instrument name.
         """
-        url = f"{BASE_URL}/public/get_ticker"
+        url = f"{self.contracts['BASE_URL']}/public/get_ticker"
         payload = {"instrument_name": instrument_name}
-        headers = {"accept": "application/json", "content-type": "application/json"}
-        response = requests.post(url, json=payload, headers=headers)
+        response = requests.post(url, json=payload, headers=PUBLIC_HEADERS)
         results = json.loads(response.content)["result"]
         return results
 
@@ -295,7 +278,7 @@ class LyraClient:
         """
         Fetch the orders for a given instrument name.
         """
-        url = f"{BASE_URL}/private/get_orders"
+        url = f"{self.contracts['BASE_URL']}/private/get_orders"
         payload = {"instrument_name": instrument_name, "subaccount_id": self.subaccount_id}
         for key, value in {"label": label, "page": page, "page_size": page_size, "status": status}.items():
             if value:
@@ -338,7 +321,7 @@ class LyraClient:
         """
         Get positions
         """
-        url = f"{BASE_URL}/private/get_positions"
+        url = f"{self.contracts['BASE_URL']}/private/get_positions"
         payload = {"subaccount_id": self.subaccount_id}
         headers = self._create_signature_headers()
         response = requests.post(url, json=payload, headers=headers)
