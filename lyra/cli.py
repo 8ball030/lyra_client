@@ -7,7 +7,7 @@ import rich_click as click
 from dotenv import load_dotenv
 from rich import print
 
-from lyra.enums import Environment, InstrumentType, OrderStatus
+from lyra.enums import Environment, InstrumentType, OrderStatus, UnderlyingCurrency
 from lyra.lyra import LyraClient
 from lyra.utils import get_logger
 
@@ -88,10 +88,16 @@ def orders():
     type=click.Choice([f.value for f in InstrumentType]),
     default=InstrumentType.PERP.value,
 )
-def fetch_instruments(ctx, instrument_type):
+@click.option(
+    "--currency",
+    "-c",
+    type=click.Choice([f.value for f in UnderlyingCurrency]),
+    default=UnderlyingCurrency.ETH.value,
+)
+def fetch_instruments(ctx, instrument_type, currency):
     """Fetch markets."""
     client = ctx.obj["client"]
-    markets = client.fetch_instruments(instrument_type=InstrumentType(instrument_type))
+    markets = client.fetch_instruments(instrument_type=InstrumentType(instrument_type), currency=UnderlyingCurrency(currency))
     print(markets)
 
 
