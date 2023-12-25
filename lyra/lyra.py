@@ -82,7 +82,7 @@ class LyraClient:
 
     def fetch_instruments(
         self,
-        expired=True,
+        expired=False,
         instrument_type: InstrumentType = InstrumentType.PERP,
         currency: UnderlyingCurrency = UnderlyingCurrency.BTC,
     ):
@@ -102,16 +102,27 @@ class LyraClient:
         results = response.json()["result"]
         return results
 
-    def fetch_subaccounts(self, wallet):
+    def fetch_subaccounts(self, wallet=None):
         """
         Returns the subaccounts for a given wallet
         """
         endpoint = "get_subaccounts"
         url = f"{BASE_URL}/private/{endpoint}"
-        payload = {"wallet": wallet}
+        payload = {"wallet": wallet if wallet else self.wallet.address}
         headers = self._create_signature_headers()
         response = requests.post(url, json=payload, headers=headers)
         results = json.loads(response.content)["result"]
+        return results
+
+    def fetch_subaccount(self, subaccount_id):
+        """
+        Returns information for a given subaccount
+        """
+        url = f"{BASE_URL}/private/get_subaccount"
+        payload = {"subaccount_id": subaccount_id}
+        headers = self._create_signature_headers()
+        response = requests.post(url, json=payload, headers=headers)
+        results = response.json()["result"]
         return results
 
     def create_order(
@@ -261,18 +272,13 @@ class LyraClient:
         order['signature'] = self.wallet.signHash(typed_data_hash).signature.hex()
         return order
 
-
-def main():
-    """Execute the main function."""
-    from tests.test_main import TEST_PRIVATE_KEY
-
-    client = LyraClient(TEST_PRIVATE_KEY)
-    client.create_order(
-        instrument_name="ETH-PERP",
-        price=1310,
-        amount=100,
-    )
-
-
-if __name__ == "__main__":
-    main()
+    def fetch_ticker(self, instrument_name):
+        """
+        Fetch the ticker for a given instrument name.
+        """
+        url = f"{BASE_URL}/public/get_ticker"
+        payload = {"instrument_name": instrument_name}
+        headers = {"accept": "application/json", "content-type": "application/json"}
+        response = requests.post(url, json=payload, headers=headers)
+        results = json.loads(response.content)["result"]
+        return results
