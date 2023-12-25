@@ -12,7 +12,7 @@ from eth_account.messages import encode_defunct
 from web3 import Web3
 from websocket import create_connection
 
-from lyra.enums import InstrumentType, OrderSide, OrderType, TimeInForce, UnderlyingCurrency
+from lyra.enums import InstrumentType, OrderSide, OrderStatus, OrderType, TimeInForce, UnderlyingCurrency
 from lyra.utils import get_logger
 
 BASE_URL = "https://api-demo.lyra.finance"
@@ -54,7 +54,7 @@ class LyraClient:
             "X-LyraSignature": Web3.to_hex(signature.signature),
         }
 
-    def __init__(self, private_key, env, logger=None, verbose=False):
+    def __init__(self, private_key, env, logger=None, verbose=False, subaccount_id=None):
         """
         Initialize the LyraClient class.
         """
@@ -63,6 +63,8 @@ class LyraClient:
         self.logger = logger or get_logger()
         self.web3_client = Web3()
         self.wallet = self.web3_client.eth.account.from_key(private_key)
+        if not subaccount_id:
+            self.subaccount_id = self.fetch_subaccounts(self.wallet.address)['subaccount_ids'][0]
 
     def create_account(self, wallet):
         """Call the create account endpoint."""
@@ -156,8 +158,7 @@ class LyraClient:
         while True:
             message = json.loads(ws.recv())
             if message['id'] == id:
-                print('Got order response:', message)
-                return message
+                return message['result']['order']
 
     def sign_authentication_header(self):
         timestamp = str(int(time.time() * 1000))
@@ -182,7 +183,7 @@ class LyraClient:
             {'method': 'public/login', 'params': self.sign_authentication_header(), 'id': str(int(time.time()))}
         )
         ws.send(login_request)
-        time.sleep(2)
+        time.sleep(1)
 
     def create_subaccount(
         amount,
@@ -281,4 +282,65 @@ class LyraClient:
         headers = {"accept": "application/json", "content-type": "application/json"}
         response = requests.post(url, json=payload, headers=headers)
         results = json.loads(response.content)["result"]
+        return results
+
+    def fetch_orders(
+        self,
+        instrument_name: str = None,
+        label: str = None,
+        page: int = 1,
+        page_size: int = 100,
+        status: OrderStatus = None,
+    ):
+        """
+        Fetch the orders for a given instrument name.
+        """
+        url = f"{BASE_URL}/private/get_orders"
+        payload = {"instrument_name": instrument_name, "subaccount_id": self.subaccount_id}
+        for key, value in {"label": label, "page": page, "page_size": page_size, "status": status}.items():
+            if value:
+                payload[key] = value
+        headers = self._create_signature_headers()
+        response = requests.post(url, json=payload, headers=headers)
+        results = response.json()["result"]['orders']
+        return results
+
+    def cancel(self, order_id, instrument_name):
+        """
+        Cancel an order
+        """
+
+        ws = self.connect_ws()
+        self.login_client(ws)
+        id = str(int(time.time()))
+        payload = {"order_id": order_id, "subaccount_id": self.subaccount_id, "instrument_name": instrument_name}
+        ws.send(json.dumps({'method': 'private/cancel', 'params': payload, 'id': id}))
+        while True:
+            message = json.loads(ws.recv())
+            if message['id'] == id:
+                return message['result']
+
+    def cancel_all(self):
+        """
+        Cancel all orders
+        """
+        ws = self.connect_ws()
+        self.login_client(ws)
+        id = str(int(time.time()))
+        payload = {"subaccount_id": self.subaccount_id}
+        ws.send(json.dumps({'method': 'private/cancel_all', 'params': payload, 'id': id}))
+        while True:
+            message = json.loads(ws.recv())
+            if message['id'] == id:
+                return message['result']
+
+    def get_positions(self):
+        """
+        Get positions
+        """
+        url = f"{BASE_URL}/private/get_positions"
+        payload = {"subaccount_id": self.subaccount_id}
+        headers = self._create_signature_headers()
+        response = requests.post(url, json=payload, headers=headers)
+        results = response.json()["result"]['positions']
         return results
