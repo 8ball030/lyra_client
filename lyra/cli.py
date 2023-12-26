@@ -40,7 +40,9 @@ def set_client(ctx):
         else:
             env = Environment.TEST
         ctx.client = LyraClient(**auth, env=env)
-    print(f"Client created for environment `{ctx.client.env.value}`")
+
+    if ctx.logger.level == "DEBUG":
+        print(f"Client created for environment `{ctx.client.env.value}`")
     return ctx.client
 
 

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "lyra-client"
+name = "lyra-v2-client"
 version = "0.1.2"
 description = ""
 authors = ["8baller <8ball030@gmail.com>"]

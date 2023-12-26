@@ -2,11 +2,13 @@
 
 This repo provides a unified interface for the Lyra V2 Exchange.
 
+Please checkout the [examples](./examples) directory for usage.
+
 
 ## Install
 
 ```bash
-pip install lyra-client
+pip install lyra-v2-client
 ```
 
 ## Dev
