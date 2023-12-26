@@ -40,7 +40,9 @@ def set_client(ctx):
         else:
             env = Environment.TEST
         ctx.client = LyraClient(**auth, env=env)
-    print(f"Client created for environment `{ctx.client.env.value}`")
+
+    if ctx.logger.level == "DEBUG":
+        print(f"Client created for environment `{ctx.client.env.value}`")
     return ctx.client
 
 
@@ -78,6 +80,36 @@ def subaccounts():
 @cli.group("orders")
 def orders():
     """Interact with orders."""
+
+
+@cli.group("collateral")
+def collateral():
+    """Interact with collateral."""
+
+
+@cli.group("positions")
+def positions():
+    """Interact with positions."""
+
+
+@positions.command("fetch")
+@click.pass_context
+def fetch_positions(ctx):
+    """Fetch positions."""
+    print("Fetching positions")
+    client = ctx.obj["client"]
+    positions = client.get_positions()
+    print(positions)
+
+
+@collateral.command("fetch")
+@click.pass_context
+def fetch_collateral(ctx):
+    """Fetch collateral."""
+    print("Fetching collateral")
+    client = ctx.obj["client"]
+    collateral = client.get_collaterals()
+    print(collateral)
 
 
 @instruments.command("fetch")
@@ -222,21 +254,25 @@ def cancel_all_orders(ctx):
     "--instrument-name",
     "-i",
     type=str,
+    required=True,
 )
 @click.option(
     "--side",
     "-s",
     type=click.Choice(i.value for i in OrderSide),
+    required=True,
 )
 @click.option(
     "--price",
     "-p",
     type=float,
+    required=True,
 )
 @click.option(
     "--amount",
     "-a",
     type=float,
+    required=True,
 )
 @click.option(
     "--order-type",
