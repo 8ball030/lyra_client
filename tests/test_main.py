@@ -54,6 +54,7 @@ def test_fetch_subaccounts(lyra_client):
     assert accounts['subaccount_ids']
 
 
+@pytest.mark.skip("Skipped until account selection is implemented on frontend.")
 def test_create_subaccount(lyra_client):
     """
     Test the LyraClient class.
