@@ -13,7 +13,7 @@ def main():
     Demonstrate fetching instruments from the lyra client.
     """
 
-    client = LyraClient(TEST_PRIVATE_KEY, env=Environment.TEST)
+    client = LyraClient(TEST_PRIVATE_KEY, env=Environment.PROD, subaccount_id=1)
 
     for instrument_type in [InstrumentType.OPTION, InstrumentType.PERP]:
         print(f"Fetching instruments for {instrument_type}")

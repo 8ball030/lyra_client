@@ -7,7 +7,7 @@ import rich_click as click
 from dotenv import load_dotenv
 from rich import print
 
-from lyra.enums import Environment, InstrumentType, OrderStatus, UnderlyingCurrency
+from lyra.enums import Environment, InstrumentType, OrderSide, OrderStatus, OrderType, UnderlyingCurrency
 from lyra.lyra import LyraClient
 from lyra.utils import get_logger
 
@@ -34,7 +34,7 @@ def set_client(ctx):
             "logger": ctx.logger,
             "verbose": ctx.logger.level == "DEBUG",
         }
-        chain = os.environ.get("ENVIROMENT")
+        chain = os.environ.get("ENVIRONMENT")
         if chain == Environment.PROD.value:
             env = Environment.PROD
         else:
@@ -213,6 +213,48 @@ def cancel_all_orders(ctx):
     print("Cancelling all orders")
     client = ctx.obj["client"]
     result = client.cancel_all()
+    print(result)
+
+
+@orders.command("create")
+@click.pass_context
+@click.option(
+    "--instrument-name",
+    "-i",
+    type=str,
+)
+@click.option(
+    "--side",
+    "-s",
+    type=click.Choice(i.value for i in OrderSide),
+)
+@click.option(
+    "--price",
+    "-p",
+    type=float,
+)
+@click.option(
+    "--amount",
+    "-a",
+    type=float,
+)
+@click.option(
+    "--order-type",
+    "-t",
+    type=click.Choice(i.value for i in OrderType),
+    default="limit",
+)
+def create_order(ctx, instrument_name, side, price, amount, order_type):
+    """Create order."""
+    print("Creating order")
+    client = ctx.obj["client"]
+    result = client.create_order(
+        instrument_name=instrument_name,
+        side=OrderSide(side),
+        price=price,
+        amount=amount,
+        order_type=OrderType(order_type),
+    )
     print(result)
 
 

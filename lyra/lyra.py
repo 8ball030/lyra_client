@@ -16,8 +16,8 @@ from lyra.constants import CONTRACTS, PUBLIC_HEADERS
 from lyra.enums import InstrumentType, OrderSide, OrderStatus, OrderType, TimeInForce, UnderlyingCurrency
 from lyra.utils import get_logger
 
-OPTION_NAME = 'ETH-PERP'
-OPTION_SUB_ID = '0'
+# OPTION_NAME = 'ETH-PERP'
+# OPTION_SUB_ID = '0'
 
 
 def to_32byte_hex(val):
@@ -47,6 +47,7 @@ class LyraClient:
         Initialize the LyraClient class.
         """
         self.verbose = verbose
+        self.env = env
         self.contracts = CONTRACTS[env]
         self.logger = logger or get_logger()
         self.web3_client = Web3()
@@ -128,14 +129,52 @@ class LyraClient:
         """
         if side.name.upper() not in OrderSide.__members__:
             raise Exception(f"Invalid side {side}")
-        order = self._define_order()
+        order = self._define_order(
+            instrument_name=instrument_name,
+            price=price,
+            amount=amount,
+            side=side,
+        )
+        _currency = UnderlyingCurrency[instrument_name.split("-")[0]]
+        if instrument_name.split("-")[1] == "PERP":
+            instruments = self.fetch_instruments(instrument_type=InstrumentType.PERP, currency=_currency)
+            instruments = {i['instrument_name']: i for i in instruments}
+            base_asset_sub_id = instruments[instrument_name]['base_asset_sub_id']
+            instrument_type = InstrumentType.PERP
+
         self.logger.info("Raw order:")
         self.logger.info(order)
-        signed_order = self._sign_order(order)
+        signed_order = self._sign_order(order, base_asset_sub_id, instrument_type, _currency)
         ws = self.connect_ws()
         self.login_client(ws)
         response = self.submit_order(signed_order, ws)
         return response
+
+    def _define_order(
+        self,
+        instrument_name: str,
+        price: float,
+        amount: float,
+        side: OrderSide,
+    ):
+        """
+        Define the order, in preparation for encoding and signing
+        """
+        ts = int(datetime.now().timestamp() * 1000)
+        return {
+            'instrument_name': instrument_name,
+            'subaccount_id': self.subaccount_id,
+            'direction': side.name.lower(),
+            'limit_price': price,
+            'amount': amount,
+            'signature_expiry_sec': int(ts) + 3000,
+            'max_fee': '200.01',
+            'nonce': int(f"{int(ts)}{random.randint(100, 999)}"),
+            'signer': self.wallet.address,
+            'order_type': 'limit',
+            'mmp': False,
+            'signature': 'filled_in_below',
+        }
 
     def submit_order(self, order, ws):
         id = str(int(time.time()))
@@ -173,58 +212,35 @@ class LyraClient:
 
     def create_subaccount(
         self,
-        amount,
-        asset_name,
-        currency="USDT",
-        margin_type="SM",
+        asset_name="USDC",
+        amount=0,
     ):
         """
         Create a subaccount
         """
         url = f"{self.contracts['BASE_URL']}/private/create_subaccount"
-
+        ts = int(datetime.now().timestamp() * 1000)
         payload = {
-            "amount": "",
-            "asset_name": "string",
-            "currency": "string",
-            "margin_type": "PM",
-            "nonce": 0,
+            "amount": f"{amount}",
+            "asset_name": f"{asset_name}",
+            "margin_type": "SM",
+            'nonce': int(f"{int(ts)}{random.randint(100, 999)}"),
             "signature": "string",
-            "signature_expiry_sec": 0,
-            "signer": "string",
-            "wallet": "string",
+            "signature_expiry_sec": int(ts) + 3000,
+            "signer": self.wallet.address,
+            "wallet": self.wallet.address,
         }
-        response = requests.post(url, json=payload, headers=PUBLIC_HEADERS)
+        print(payload)
+        headers = self._create_signature_headers()
+        response = requests.post(url, json=payload, headers=headers)
         print(response.text)
 
-    def _define_order(
-        self,
-    ):
-        """
-        Define the order, in preparation for encoding and signing
-        """
-        ts = int(datetime.now().timestamp() * 1000)
-        return {
-            'instrument_name': OPTION_NAME,
-            'subaccount_id': self.subaccount_id,
-            'direction': 'buy',
-            'limit_price': 1310,
-            'amount': 100,
-            'signature_expiry_sec': int(ts) + 3000,
-            'max_fee': '10.01',
-            'nonce': int(f"{int(ts)}{random.randint(100, 999)}"),
-            'signer': self.wallet.address,
-            'order_type': 'limit',
-            'mmp': False,
-            'signature': 'filled_in_below',
-        }
-
-    def _encode_trade_data(self, order):
+    def _encode_trade_data(self, order, base_asset_sub_id, instrument_type, currency):
         encoded_data = eth_abi.encode(
             ['address', 'uint256', 'int256', 'int256', 'uint256', 'uint256', 'bool'],
             [
-                self.contracts['ASSET_ADDRESS'],
-                int(OPTION_SUB_ID),
+                self.contracts[f'{currency.name}_{instrument_type.name}_ADDRESS'],
+                int(base_asset_sub_id),
                 self.web3_client.to_wei(order['limit_price'], 'ether'),
                 self.web3_client.to_wei(order['amount'], 'ether'),
                 self.web3_client.to_wei(order['max_fee'], 'ether'),
@@ -235,8 +251,8 @@ class LyraClient:
 
         return self.web3_client.keccak(encoded_data)
 
-    def _sign_order(self, order):
-        trade_module_data = self._encode_trade_data(order)
+    def _sign_order(self, order, base_asset_sub_id, instrument_type, currency):
+        trade_module_data = self._encode_trade_data(order, base_asset_sub_id, instrument_type, currency)
         encoded_action_hash = eth_abi.encode(
             ['bytes32', 'uint256', 'uint256', 'address', 'bytes32', 'uint256', 'address', 'address'],
             [
