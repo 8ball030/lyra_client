@@ -87,8 +87,7 @@ class LyraClient:
             "instrument_type": instrument_type.value,
             "currency": currency.name,
         }
-        headers = {"accept": "application/json", "content-type": "application/json"}
-        response = requests.post(url, json=payload, headers=headers)
+        response = requests.post(url, json=payload, headers=PUBLIC_HEADERS)
         results = response.json()["result"]
         return results
 
@@ -142,8 +141,6 @@ class LyraClient:
             base_asset_sub_id = instruments[instrument_name]['base_asset_sub_id']
             instrument_type = InstrumentType.PERP
 
-        self.logger.info("Raw order:")
-        self.logger.info(order)
         signed_order = self._sign_order(order, base_asset_sub_id, instrument_type, _currency)
         ws = self.connect_ws()
         self.login_client(ws)
@@ -179,7 +176,6 @@ class LyraClient:
     def submit_order(self, order, ws):
         id = str(int(time.time()))
         ws.send(json.dumps({'method': 'private/order', 'params': order, 'id': id}))
-        self.logger.info(order)
         while True:
             message = json.loads(ws.recv())
             if message['id'] == id:
@@ -204,11 +200,17 @@ class LyraClient:
         return ws
 
     def login_client(self, ws):
-        login_request = json.dumps(
-            {'method': 'public/login', 'params': self.sign_authentication_header(), 'id': str(int(time.time()))}
-        )
-        ws.send(login_request)
-        time.sleep(1)
+        login_request = {
+            'method': 'public/login',
+            'params': self.sign_authentication_header(),
+            'id': str(int(time.time())),
+        }
+        ws.send(json.dumps(login_request))
+        # we need to wait for the response
+        while True:
+            message = json.loads(ws.recv())
+            if message['id'] == login_request['id']:
+                break
 
     def create_subaccount(
         self,
