@@ -345,3 +345,14 @@ class LyraClient:
         response = requests.post(url, json=payload, headers=headers)
         results = response.json()["result"]['positions']
         return results
+
+    def get_collaterals(self):
+        """
+        Get collaterals
+        """
+        url = f"{self.contracts['BASE_URL']}/private/get_collaterals"
+        payload = {"subaccount_id": self.subaccount_id}
+        headers = self._create_signature_headers()
+        response = requests.post(url, json=payload, headers=headers)
+        results = response.json()["result"]['collaterals']
+        return results.pop()

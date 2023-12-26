@@ -2,7 +2,7 @@
 
 set -e
 
-SLEEP_TIME=1
+SLEEP_TIME=3
 
 cowsay The lyra V2 client offers both a library and a cli tool to manage positions on LyraV2.
 
@@ -38,7 +38,7 @@ lyra instruments fetch -i perp
 sleep $SLEEP_TIME
 clear
 
-echo \`lyra instruments fetch -i perp -c btc
+echo \`lyra instruments fetch -i perp -c btc\`
 lyra instruments fetch -i perp -c btc
 sleep $SLEEP_TIME
 clear
@@ -65,7 +65,20 @@ clear
 
 
 cowsay "we can then cancel them"
-echo \`lyra orders fetch -i ETH-PERP --status open\`
+echo \`lyra orders cancel_all\`
 lyra orders cancel_all
+sleep $SLEEP_TIME
+clear
 
+cowsay "we can also check our balances"
+echo \`lyra collateral fetch\`
+lyra collateral fetch
+sleep $SLEEP_TIME
+clear
+
+cowsay "we can also check our positions"
+echo \`lyra positions fetch\`
+lyra positions fetch
+sleep $SLEEP_TIME
+clear
 

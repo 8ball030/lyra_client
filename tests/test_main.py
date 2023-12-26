@@ -163,3 +163,9 @@ def test_get_positions(lyra_client):
     """Test get positions."""
     positions = lyra_client.get_positions()
     assert isinstance(positions, list)
+
+
+def test_get_collaterals(lyra_client):
+    """Test get collaterals."""
+    collaterals = lyra_client.get_collaterals()
+    assert isinstance(collaterals, dict)
