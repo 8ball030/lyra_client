@@ -3,11 +3,11 @@ tests:
 	poetry run pytest tests -vv
 
 fmt:
-	poetry run black tests lyra samples
-	poetry run isort tests lyra samples
+	poetry run black tests lyra examples
+	poetry run isort tests lyra examples
 
 lint:
-	poetry run flake8 tests lyra samples
+	poetry run flake8 tests lyra examples
 
 all: fmt lint tests
 
