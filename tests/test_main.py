@@ -54,18 +54,40 @@ def test_fetch_subaccounts(lyra_client):
     assert accounts['subaccount_ids']
 
 
-def test_create_order(lyra_client):
+@pytest.mark.skip("Skipped until account selection is implemented on frontend.")
+def test_create_subaccount(lyra_client):
+    """
+    Test the LyraClient class.
+    """
+    subaccount_id = lyra_client.create_subaccount()
+    assert subaccount_id
+
+
+@pytest.mark.parametrize(
+    "instrument_name, side, price",
+    [
+        ("ETH-PERP", OrderSide.BUY, 200),
+        ("ETH-PERP", OrderSide.SELL, 10000),
+        ("BTC-PERP", OrderSide.BUY, 2000),
+        ("BTC-PERP", OrderSide.SELL, 100000),
+    ],
+)
+def test_create_order(lyra_client, instrument_name, side, price):
     """
     Test the LyraClient class.
     """
     result = lyra_client.create_order(
-        price=200,
+        price=price,
         amount=1,
-        instrument_name="ETH-PERP",
-        side=OrderSide.BUY,
+        instrument_name=instrument_name,
+        side=OrderSide(side),
         order_type=OrderType.LIMIT,
     )
     assert "error" not in result
+    order_price = float(result['limit_price'])
+    order_side = result['direction']
+    assert order_price == price
+    assert order_side == side.value
 
 
 def test_fetch_ticker(lyra_client):

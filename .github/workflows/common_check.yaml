@@ -40,10 +40,6 @@ jobs:
         run: |
           poetry install -v
 
-      - name: Install Host Dependencies
-        run: |
-          poetry run python script/install.py
-
       - name: Lint
         run: |
           poetry run make lint
