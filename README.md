@@ -34,7 +34,7 @@ make lint
 make tests
 ```
 
-For convience, all commands can be run with;
+For convience, all commands can be run with:
 
 ```
 make all
