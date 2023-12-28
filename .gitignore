@@ -114,6 +114,6 @@ ENV/
 site/
 .history
 
-trader
+*trader
 
 node_modules

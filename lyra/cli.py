@@ -39,7 +39,10 @@ def set_client(ctx):
             env = Environment.PROD
         else:
             env = Environment.TEST
-        ctx.client = LyraClient(**auth, env=env)
+
+        subaccount_id = os.environ.get("SUBACCOUNT_ID")
+        wallet = os.environ.get("WALLET")
+        ctx.client = LyraClient(**auth, env=env, subaccount_id=subaccount_id, wallet=wallet)
 
     if ctx.logger.level == "DEBUG":
         print(f"Client created for environment `{ctx.client.env.value}`")

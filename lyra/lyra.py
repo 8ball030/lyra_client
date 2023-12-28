@@ -27,7 +27,9 @@ def to_32byte_hex(val):
 class LyraClient:
     """Client for the lyra dex."""
 
-    def _create_signature_headers(self):
+    def _create_signature_headers(
+        self,
+    ):
         """
         Create the signature headers
         """
@@ -35,14 +37,14 @@ class LyraClient:
         msg = encode_defunct(
             text=timestamp,
         )
-        signature = self.wallet.sign_message(msg)
+        signature = self.signer.sign_message(msg)
         return {
-            "X-LyraWallet": self.wallet.address,
+            "X-LyraWallet": self.wallet,
             "X-LyraTimestamp": timestamp,
             "X-LyraSignature": Web3.to_hex(signature.signature),
         }
 
-    def __init__(self, private_key, env, logger=None, verbose=False, subaccount_id=None):
+    def __init__(self, private_key, env, logger=None, verbose=False, subaccount_id=None, wallet=None):
         """
         Initialize the LyraClient class.
         """
@@ -51,9 +53,15 @@ class LyraClient:
         self.contracts = CONTRACTS[env]
         self.logger = logger or get_logger()
         self.web3_client = Web3()
-        self.wallet = self.web3_client.eth.account.from_key(private_key)
+        self.signer = self.web3_client.eth.account.from_key(private_key)
+        self.wallet = self.signer.address if not wallet else wallet
+        print(f"Signing address: {self.signer.address}")
+        if wallet:
+            print(f"Using wallet: {wallet}")
         if not subaccount_id:
-            self.subaccount_id = self.fetch_subaccounts(self.wallet.address)['subaccount_ids'][0]
+            self.subaccount_id = self.fetch_subaccounts()['subaccount_ids'][0]
+        else:
+            self.subaccount_id = subaccount_id
 
     def create_account(self, wallet):
         """Call the create account endpoint."""
@@ -91,12 +99,12 @@ class LyraClient:
         results = response.json()["result"]
         return results
 
-    def fetch_subaccounts(self, wallet=None):
+    def fetch_subaccounts(self):
         """
         Returns the subaccounts for a given wallet
         """
         url = f"{self.contracts['BASE_URL']}/private/get_subaccounts"
-        payload = {"wallet": wallet if wallet else self.wallet.address}
+        payload = {"wallet": self.wallet}
         headers = self._create_signature_headers()
         response = requests.post(url, json=payload, headers=headers)
         results = json.loads(response.content)["result"]
@@ -167,7 +175,7 @@ class LyraClient:
             'signature_expiry_sec': int(ts) + 3000,
             'max_fee': '200.01',
             'nonce': int(f"{int(ts)}{random.randint(100, 999)}"),
-            'signer': self.wallet.address,
+            'signer': self.signer.address,
             'order_type': 'limit',
             'mmp': False,
             'signature': 'filled_in_below',
@@ -187,10 +195,10 @@ class LyraClient:
             text=timestamp,
         )
         signature = self.web3_client.eth.account.sign_message(
-            msg, private_key=self.wallet._private_key
+            msg, private_key=self.signer._private_key
         ).signature.hex()  # pylint: disable=protected-access
         return {
-            'wallet': self.wallet.address,
+            'wallet': self.wallet,
             'timestamp': str(timestamp),
             'signature': signature,
         }
@@ -210,6 +218,8 @@ class LyraClient:
         while True:
             message = json.loads(ws.recv())
             if message['id'] == login_request['id']:
+                if "result" not in message:
+                    raise Exception(f"Unable to login {message}")
                 break
 
     def create_subaccount(
@@ -264,7 +274,7 @@ class LyraClient:
                 self.contracts['TRADE_MODULE_ADDRESS'],
                 trade_module_data,
                 order['signature_expiry_sec'],
-                self.wallet.address,
+                self.wallet,
                 order['signer'],
             ],
         )
@@ -272,7 +282,7 @@ class LyraClient:
         action_hash = self.web3_client.keccak(encoded_action_hash)
         encoded_typed_data_hash = "".join(['0x1901', self.contracts['DOMAIN_SEPARATOR'][2:], action_hash.hex()[2:]])
         typed_data_hash = self.web3_client.keccak(hexstr=encoded_typed_data_hash)
-        order['signature'] = self.wallet.signHash(typed_data_hash).signature.hex()
+        order['signature'] = self.signer.signHash(typed_data_hash).signature.hex()
         return order
 
     def fetch_ticker(self, instrument_name):

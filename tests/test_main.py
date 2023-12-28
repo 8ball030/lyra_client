@@ -50,7 +50,7 @@ def test_fetch_subaccounts(lyra_client):
     """
     Test the LyraClient class.
     """
-    accounts = lyra_client.fetch_subaccounts(TEST_WALLET)
+    accounts = lyra_client.fetch_subaccounts()
     assert accounts['subaccount_ids']
 
 
