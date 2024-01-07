@@ -169,3 +169,9 @@ def test_get_collaterals(lyra_client):
     """Test get collaterals."""
     collaterals = lyra_client.get_collaterals()
     assert isinstance(collaterals, dict)
+
+
+def test_get_tickers(lyra_client):
+    """Test get tickers."""
+    tickers = lyra_client.fetch_tickers()
+    assert isinstance(tickers, dict)

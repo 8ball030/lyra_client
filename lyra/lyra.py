@@ -62,6 +62,8 @@ class LyraClient:
             self.subaccount_id = self.fetch_subaccounts()['subaccount_ids'][0]
         else:
             self.subaccount_id = subaccount_id
+        self.ws = self.connect_ws()
+        self.login_client()
 
     def create_account(self, wallet):
         """Call the create account endpoint."""
@@ -150,9 +152,7 @@ class LyraClient:
             instrument_type = InstrumentType.PERP
 
         signed_order = self._sign_order(order, base_asset_sub_id, instrument_type, _currency)
-        ws = self.connect_ws()
-        self.login_client(ws)
-        response = self.submit_order(signed_order, ws)
+        response = self.submit_order(signed_order)
         return response
 
     def _define_order(
@@ -181,11 +181,11 @@ class LyraClient:
             'signature': 'filled_in_below',
         }
 
-    def submit_order(self, order, ws):
+    def submit_order(self, order):
         id = str(int(time.time()))
-        ws.send(json.dumps({'method': 'private/order', 'params': order, 'id': id}))
+        self.ws.send(json.dumps({'method': 'private/order', 'params': order, 'id': id}))
         while True:
-            message = json.loads(ws.recv())
+            message = json.loads(self.ws.recv())
             if message['id'] == id:
                 return message['result']['order']
 
@@ -207,16 +207,18 @@ class LyraClient:
         ws = create_connection(self.contracts['WS_ADDRESS'])
         return ws
 
-    def login_client(self, ws):
+    def login_client(
+        self,
+    ):
         login_request = {
             'method': 'public/login',
             'params': self.sign_authentication_header(),
             'id': str(int(time.time())),
         }
-        ws.send(json.dumps(login_request))
+        self.ws.send(json.dumps(login_request))
         # we need to wait for the response
         while True:
-            message = json.loads(ws.recv())
+            message = json.loads(self.ws.recv())
             if message['id'] == login_request['id']:
                 if "result" not in message:
                     raise Exception(f"Unable to login {message}")
@@ -321,13 +323,11 @@ class LyraClient:
         Cancel an order
         """
 
-        ws = self.connect_ws()
-        self.login_client(ws)
         id = str(int(time.time()))
         payload = {"order_id": order_id, "subaccount_id": self.subaccount_id, "instrument_name": instrument_name}
-        ws.send(json.dumps({'method': 'private/cancel', 'params': payload, 'id': id}))
+        self.ws.send(json.dumps({'method': 'private/cancel', 'params': payload, 'id': id}))
         while True:
-            message = json.loads(ws.recv())
+            message = json.loads(self.ws.recv())
             if message['id'] == id:
                 return message['result']
 
@@ -335,13 +335,11 @@ class LyraClient:
         """
         Cancel all orders
         """
-        ws = self.connect_ws()
-        self.login_client(ws)
         id = str(int(time.time()))
         payload = {"subaccount_id": self.subaccount_id}
-        ws.send(json.dumps({'method': 'private/cancel_all', 'params': payload, 'id': id}))
+        self.ws.send(json.dumps({'method': 'private/cancel_all', 'params': payload, 'id': id}))
         while True:
-            message = json.loads(ws.recv())
+            message = json.loads(self.ws.recv())
             if message['id'] == id:
                 return message['result']
 
@@ -366,3 +364,29 @@ class LyraClient:
         response = requests.post(url, json=payload, headers=headers)
         results = response.json()["result"]['collaterals']
         return results.pop()
+
+    def fetch_tickers(
+        self,
+        instrument_type: InstrumentType = InstrumentType.OPTION,
+        currency: UnderlyingCurrency = UnderlyingCurrency.BTC,
+    ):
+        """
+        Fetch tickers using the ws connection
+        """
+        instruments = self.fetch_instruments(instrument_type=instrument_type, currency=currency)
+        instrument_names = [i['instrument_name'] for i in instruments]
+        id_base = str(int(time.time()))
+        ids_to_instrument_names = {
+            f'{id_base}_{enumerate}': instrument_name for enumerate, instrument_name in enumerate(instrument_names)
+        }
+        for id, instrument_name in ids_to_instrument_names.items():
+            payload = {"instrument_name": instrument_name}
+            self.ws.send(json.dumps({'method': 'public/get_ticker', 'params': payload, 'id': id}))
+            time.sleep(0.05)  # otherwise we get rate limited...
+        results = {}
+        while ids_to_instrument_names:
+            message = json.loads(self.ws.recv())
+            if message['id'] in ids_to_instrument_names:
+                results[message['result']['instrument_name']] = message['result']
+                del ids_to_instrument_names[message['id']]
+        return results
