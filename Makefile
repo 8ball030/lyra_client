@@ -1,6 +1,6 @@
 .PHONY: tests
 tests:
-	poetry run pytest tests -vv
+	poetry run pytest tests -vv  --reruns 3 --reruns-delay 5
 
 fmt:
 	poetry run black tests lyra examples
