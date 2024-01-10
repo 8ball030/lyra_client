@@ -175,3 +175,31 @@ def test_get_tickers(lyra_client):
     """Test get tickers."""
     tickers = lyra_client.fetch_tickers()
     assert isinstance(tickers, dict)
+
+
+@pytest.mark.parametrize(
+    "currency, side",
+    [
+        (UnderlyingCurrency.ETH, OrderSide.BUY),
+        (UnderlyingCurrency.ETH, OrderSide.SELL),
+        (UnderlyingCurrency.BTC, OrderSide.BUY),
+        (UnderlyingCurrency.BTC, OrderSide.SELL),
+    ],
+)
+def test_can_create_option_order(lyra_client, currency, side):
+    """Test can create option order."""
+    tickers = lyra_client.fetch_tickers(
+        instrument_type=InstrumentType.OPTION,
+        currency=currency,
+    )
+    symbol, ticker = tickers.popitem()
+    index_price = float(ticker['mark_price'])
+    order_price = index_price * 1.1 if side == OrderSide.SELL else index_price * 0.9
+    order = lyra_client.create_order(
+        price=int(order_price),
+        amount=1,
+        instrument_name=symbol,
+        side=side,
+        order_type=OrderType.LIMIT,
+    )
+    assert order

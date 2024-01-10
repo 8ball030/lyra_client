@@ -150,6 +150,11 @@ class LyraClient:
             instruments = {i['instrument_name']: i for i in instruments}
             base_asset_sub_id = instruments[instrument_name]['base_asset_sub_id']
             instrument_type = InstrumentType.PERP
+        else:
+            instruments = self.fetch_instruments(instrument_type=InstrumentType.OPTION, currency=_currency)
+            instruments = {i['instrument_name']: i for i in instruments}
+            base_asset_sub_id = instruments[instrument_name]['base_asset_sub_id']
+            instrument_type = InstrumentType.OPTION
 
         signed_order = self._sign_order(order, base_asset_sub_id, instrument_type, _currency)
         response = self.submit_order(signed_order)
@@ -187,7 +192,10 @@ class LyraClient:
         while True:
             message = json.loads(self.ws.recv())
             if message['id'] == id:
-                return message['result']['order']
+                try:
+                    return message['result']['order']
+                except KeyError as error:
+                    raise Exception(f"Unable to submit order {message}") from error
 
     def sign_authentication_header(self):
         timestamp = str(int(time.time() * 1000))
