@@ -5,7 +5,7 @@ from itertools import product
 
 import pytest
 
-from lyra.enums import Environment, InstrumentType, OrderSide, OrderType, UnderlyingCurrency
+from lyra.enums import Environment, InstrumentType, OrderSide, OrderType, SubaccountType, UnderlyingCurrency
 from lyra.lyra import LyraClient
 from lyra.utils import get_logger
 
@@ -54,7 +54,6 @@ def test_fetch_subaccounts(lyra_client):
     assert accounts['subaccount_ids']
 
 
-@pytest.mark.skip("Skipped until account selection is implemented on frontend.")
 def test_create_subaccount(lyra_client):
     """
     Test the LyraClient class.
@@ -192,14 +191,32 @@ def test_can_create_option_order(lyra_client, currency, side):
         instrument_type=InstrumentType.OPTION,
         currency=currency,
     )
-    symbol, ticker = tickers.popitem()
-    index_price = float(ticker['mark_price'])
-    order_price = index_price * 1.1 if side == OrderSide.SELL else index_price * 0.9
+    symbol, ticker = [f for f in tickers.items()][0]
+    if side == OrderSide.BUY:
+        order_price = ticker['min_price']
+    else:
+        order_price = ticker['max_price']
     order = lyra_client.create_order(
-        price=int(order_price),
+        price=order_price,
         amount=1,
         instrument_name=symbol,
         side=side,
         order_type=OrderType.LIMIT,
     )
     assert order
+
+
+def test_encode_deposit_data_standard_margin(lyra_client):
+    """Test encode deposit data."""
+    deposit_data = lyra_client._encode_deposit_data(
+        amount=0.0,
+        subaccount_type=SubaccountType.STANDARD,
+    )
+    assert deposit_data
+
+
+def test_get_subaccount_balance(lyra_client):
+    """Test get subaccount balance."""
+    subaccount_id = lyra_client.fetch_subaccounts()['subaccount_ids'][0]
+    balance = lyra_client.get_subaccount_balance(subaccount_id)
+    assert balance

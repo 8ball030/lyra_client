@@ -13,7 +13,15 @@ from web3 import Web3
 from websocket import create_connection
 
 from lyra.constants import CONTRACTS, PUBLIC_HEADERS
-from lyra.enums import InstrumentType, OrderSide, OrderStatus, OrderType, TimeInForce, UnderlyingCurrency
+from lyra.enums import (
+    InstrumentType,
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    SubaccountType,
+    TimeInForce,
+    UnderlyingCurrency,
+)
 from lyra.utils import get_logger
 
 # OPTION_NAME = 'ETH-PERP'
@@ -166,6 +174,7 @@ class LyraClient:
         price: float,
         amount: float,
         side: OrderSide,
+        time_in_force: TimeInForce = TimeInForce.GTC,
     ):
         """
         Define the order, in preparation for encoding and signing
@@ -183,6 +192,7 @@ class LyraClient:
             'signer': self.signer.address,
             'order_type': 'limit',
             'mmp': False,
+            'time_in_force': time_in_force.value,
             'signature': 'filled_in_below',
         }
 
@@ -195,6 +205,7 @@ class LyraClient:
                 try:
                     return message['result']['order']
                 except KeyError as error:
+                    print(message)
                     raise Exception(f"Unable to submit order {message}") from error
 
     def sign_authentication_header(self):
@@ -242,20 +253,48 @@ class LyraClient:
         """
         url = f"{self.contracts['BASE_URL']}/private/create_subaccount"
         ts = int(datetime.now().timestamp() * 1000)
+        nonce = int(f"{int(ts)}{random.randint(100, 999)}")
+        expiration = int(ts) + 6000
         payload = {
             "amount": f"{amount}",
             "asset_name": f"{asset_name}",
             "margin_type": "SM",
-            'nonce': int(f"{int(ts)}{random.randint(100, 999)}"),
+            'nonce': nonce,
             "signature": "string",
-            "signature_expiry_sec": int(ts) + 3000,
-            "signer": self.wallet.address,
-            "wallet": self.wallet.address,
+            "signature_expiry_sec": expiration,
+            "signer": self.signer.address,
+            "wallet": self.wallet,
         }
         print(payload)
+        breakpoint()
         headers = self._create_signature_headers()
         response = requests.post(url, json=payload, headers=headers)
         print(response.text)
+
+    def _encode_deposit_data(
+        self, amount: int, subaccount_type: SubaccountType, underlying_currency: UnderlyingCurrency = None
+    ):
+        """
+        Encode the deposit data
+        """
+        if subaccount_type is SubaccountType.STANDARD:
+            contract_key = f"{subaccount_type.name}_RISK_MANAGER_ADDRESS"
+        elif subaccount_type is SubaccountType.PORTFOLIO:
+            if not underlying_currency:
+                raise Exception("Underlying currency must be provided for portfolio subaccounts")
+            contract_key = f"{underlying_currency.name}_{subaccount_type.name}_RISK_MANAGER_ADDRESS"
+        else:
+            raise Exception(f"Invalid subaccount type {subaccount_type}")
+
+        encoded_data = eth_abi.encode(
+            ['uint256', 'address', 'address'],
+            [
+                int(amount * 1e6),
+                self.contracts["CASH_ASSET"],
+                self.contracts[contract_key],
+            ],
+        )
+        return self.web3_client.keccak(encoded_data)
 
     def _encode_trade_data(self, order, base_asset_sub_id, instrument_type, currency):
         encoded_data = eth_abi.encode(
@@ -294,6 +333,32 @@ class LyraClient:
         typed_data_hash = self.web3_client.keccak(hexstr=encoded_typed_data_hash)
         order['signature'] = self.signer.signHash(typed_data_hash).signature.hex()
         return order
+
+    def _sign_deposit(self, deposit, subaccount_type: SubaccountType, underlying_currency=None):
+        """Handle the deposit to a new subaccount."""
+        if deposit['margin_type'] == "SM":
+            account_type = SubaccountType.STANDARD
+        elif deposit['margin_type'] == "PM":
+            account_type = SubaccountType.PORTFOLIO
+        else:
+            raise Exception(f"Invalid margin type {deposit['margin_type']}")
+        deposit_data = self._encode_deposit_data(
+            amount=deposit['amount'],
+            subaccount_type=subaccount_type,
+        )
+        encoded_action_hash = eth_abi.encode(
+            ['bytes32', 'uint256', 'uint256', 'address', 'bytes32', 'uint256', 'address', 'address'],
+            [
+                bytes.fromhex(self.contracts['ACTION_TYPEHASH'][2:]),
+                self.subaccount_id,
+                deposit['nonce'],
+                self.contracts['DEPOSIT_MODULE_ADDRESS'],
+                deposit_data,
+                deposit['signature_expiry_sec'],
+                self.wallet,
+                self.signer.address,
+            ],
+        )
 
     def fetch_ticker(self, instrument_name):
         """

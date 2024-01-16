@@ -151,7 +151,7 @@ def fetch_tickers(ctx, instrument_name):
     print(ticker)
 
 
-@subaccounts.command("fetch")
+@subaccounts.command("all")
 @click.pass_context
 def fetch_subaccounts(ctx):
     """Fetch subaccounts."""
@@ -159,6 +159,20 @@ def fetch_subaccounts(ctx):
     client = ctx.obj["client"]
     subaccounts = client.fetch_subaccounts()
     print(subaccounts)
+
+
+@subaccounts.command("fetch")
+@click.argument(
+    "subaccount_id",
+    type=int,
+)
+@click.pass_context
+def fetch_subaccount(ctx, subaccount_id):
+    """Fetch subaccount."""
+    print("Fetching subaccount")
+    client = ctx.obj["client"]
+    subaccount = client.fetch_subaccount(subaccount_id=subaccount_id)
+    print(subaccount)
 
 
 @subaccounts.command("info")

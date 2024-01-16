@@ -57,3 +57,19 @@ class Environment(Enum):
 
     PROD = "prod"
     TEST = "test"
+
+
+class SubaccountType(Enum):
+    """
+    Type of sub account
+    """
+
+    STANDARD = "standard"
+    PORTFOLIO = "portfolio"
+
+
+class TimeInForce(Enum):
+    """Time in force."""
+
+    GTC = "gtc"
+    POST_ONLY = "post_only"
