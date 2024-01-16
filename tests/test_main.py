@@ -1,7 +1,9 @@
 """
 Tests for the main function.
 """
+from datetime import datetime
 from itertools import product
+import random
 
 import pytest
 
@@ -206,14 +208,42 @@ def test_can_create_option_order(lyra_client, currency, side):
     assert order
 
 
-def test_encode_deposit_data_standard_margin(lyra_client):
+@pytest.mark.parametrize(
+    "subaccount_type,underlying,result",
+    [
+        (SubaccountType.STANDARD, None, "0x247da26f2c790be0f0838efa1403703863af35a74c439665dca40a4491bd8c2f"),
+        (SubaccountType.PORTFOLIO, UnderlyingCurrency.ETH, "0xaf75590c7dde08338ed8f52c718140000bdee1476232b1321e694807d739aa74"),
+    ],
+)
+def test_encode_deposit_data(lyra_client, subaccount_type, underlying, result):
     """Test encode deposit data."""
+    deposit_data = lyra_client._encode_deposit_data(
+        amount=0.0,
+        subaccount_type=subaccount_type,
+        underlying_currency=underlying,
+    )
+    assert deposit_data.hex() == result, f"{deposit_data} != {result}"
+
+
+def test_subaccount_deposit_signature(lyra_client):
+    """Test encode deposit signature."""
+    ts = int(datetime.now().timestamp() * 1000)
+
+    expiration = ts + 300
+    nonce = int(f"{int(ts)}{random.randint(100, 999)}")
     deposit_data = lyra_client._encode_deposit_data(
         amount=0.0,
         subaccount_type=SubaccountType.STANDARD,
     )
-    assert deposit_data
-
+    subaccount_id = 0
+    deposit_signature = lyra_client._generate_deposit_signature(
+        subaccount_id=subaccount_id,
+        deposit_data=deposit_data,
+        expiration=expiration,
+        nonce=nonce,
+    )
+    assert deposit_signature
+    
 
 def test_get_subaccount_balance(lyra_client):
     """Test get subaccount balance."""
