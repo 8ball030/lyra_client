@@ -7,7 +7,16 @@ import rich_click as click
 from dotenv import load_dotenv
 from rich import print
 
-from lyra.enums import Environment, InstrumentType, OrderSide, OrderStatus, OrderType, UnderlyingCurrency
+from lyra.enums import (
+    CollateralAsset,
+    Environment,
+    InstrumentType,
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    SubaccountType,
+    UnderlyingCurrency,
+)
 from lyra.lyra import LyraClient
 from lyra.utils import get_logger
 
@@ -40,7 +49,7 @@ def set_client(ctx):
         else:
             env = Environment.TEST
 
-        subaccount_id = os.environ.get("SUBACCOUNT_ID")
+        subaccount_id = int(os.environ.get("SUBACCOUNT_ID"))
         wallet = os.environ.get("WALLET")
         ctx.client = LyraClient(**auth, env=env, subaccount_id=subaccount_id, wallet=wallet)
 
@@ -151,6 +160,35 @@ def fetch_tickers(ctx, instrument_name):
     print(ticker)
 
 
+@collateral.command("transfer")
+@click.pass_context
+@click.option(
+    "--amount",
+    "-a",
+    type=float,
+    required=True,
+)
+@click.option(
+    "--to",
+    "-t",
+    type=int,
+    required=True,
+    help="Subaccount ID to transfer to",
+)
+@click.option(
+    "--asset",
+    "-s",
+    type=click.Choice([f.value for f in CollateralAsset]),
+    default=CollateralAsset.USDC.value,
+)
+def transfer_collateral(ctx, amount, to, asset):
+    """Transfer collateral."""
+    client = ctx.obj["client"]
+    result = client.transfer_collateral(amount=amount, to=to, asset=CollateralAsset(asset))
+
+    print(result)
+
+
 @subaccounts.command("all")
 @click.pass_context
 def fetch_subaccounts(ctx):
@@ -175,18 +213,46 @@ def fetch_subaccount(ctx, subaccount_id):
     print(subaccount)
 
 
-@subaccounts.command("info")
+@subaccounts.command("create")
 @click.pass_context
-@click.argument(
-    "subaccount_id",
-    type=int,
+@click.option(
+    "--underlying-currency",
+    "-u",
+    type=click.Choice([f.value for f in UnderlyingCurrency]),
+    default=UnderlyingCurrency.ETH.value,
 )
-def fetch_subaccount(ctx, subaccount_id):
-    """Fetch subaccount."""
-    print("Fetching subaccount")
+@click.option(
+    "--subaccount-type",
+    "-s",
+    type=click.Choice([f.value for f in SubaccountType]),
+    default=SubaccountType.PORTFOLIO.value,
+)
+@click.option(
+    "--collateral-asset",
+    "-c",
+    type=click.Choice([f.value for f in CollateralAsset]),
+    default=CollateralAsset.USDC.value,
+)
+@click.option(
+    "--amount",
+    "-a",
+    type=float,
+    default=0,
+)
+def create_subaccount(ctx, collateral_asset, underlying_currency, subaccount_type, amount):
+    """Create subaccount."""
+    underlying_currency = UnderlyingCurrency(underlying_currency)
+    subaccount_type = SubaccountType(subaccount_type)
+    collateral_asset = CollateralAsset(collateral_asset)
+    print(f"Creating subaccount with collateral asset {collateral_asset} and underlying currency {underlying_currency}")
     client = ctx.obj["client"]
-    subaccount = client.fetch_subaccount(subaccount_id=subaccount_id)
-    print(subaccount)
+    subaccount_id = client.create_subaccount(
+        amount=int(amount * 1e6),
+        subaccount_type=subaccount_type,
+        collateral_asset=collateral_asset,
+        underlying_currency=underlying_currency,
+    )
+    print(subaccount_id)
 
 
 @orders.command("fetch")

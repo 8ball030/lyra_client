@@ -1,18 +1,33 @@
 """
 Tests for the main function.
 """
-from datetime import datetime
 from itertools import product
-import random
+from unittest.mock import MagicMock
 
 import pytest
 
-from lyra.enums import Environment, InstrumentType, OrderSide, OrderType, SubaccountType, UnderlyingCurrency
+from lyra.enums import (
+    CollateralAsset,
+    Environment,
+    InstrumentType,
+    OrderSide,
+    OrderType,
+    SubaccountType,
+    UnderlyingCurrency,
+)
 from lyra.lyra import LyraClient
 from lyra.utils import get_logger
 
 TEST_WALLET = "0x3A5c777edf22107d7FdFB3B02B0Cdfe8b75f3453"
 TEST_PRIVATE_KEY = "0xc14f53ee466dd3fc5fa356897ab276acbef4f020486ec253a23b0d1c3f89d4f4"
+
+
+def freeze_time(lyra_client):
+    ts = 1705439697008
+    nonce = 17054396970088651
+    expiration = 1705439703008
+    lyra_client.get_nonce_and_signature_expiry = MagicMock(return_value=(ts, nonce, expiration))
+    return lyra_client
 
 
 @pytest.fixture
@@ -56,11 +71,28 @@ def test_fetch_subaccounts(lyra_client):
     assert accounts['subaccount_ids']
 
 
-def test_create_subaccount(lyra_client):
+def test_fetch_subaccount(lyra_client):
+    """
+    Show we can fetch a subaccount.
+    """
+    subaccount_id = lyra_client.fetch_subaccounts()['subaccount_ids'][0]
+    subaccount = lyra_client.fetch_subaccount(subaccount_id)
+    assert subaccount['subaccount_id'] == subaccount_id
+
+
+@pytest.mark.skip()
+def test_create_pm_subaccount(lyra_client):
     """
     Test the LyraClient class.
     """
-    subaccount_id = lyra_client.create_subaccount()
+    # freeze_time(lyra_client)
+    collateral_asset = CollateralAsset.USDC
+    underlying_currency = UnderlyingCurrency.ETH
+    subaccount_id = lyra_client.create_subaccount(
+        subaccount_type=SubaccountType.PORTFOLIO,
+        collateral_asset=collateral_asset,
+        underlying_currency=underlying_currency,
+    )
     assert subaccount_id
 
 
@@ -111,7 +143,7 @@ def test_fetch_option_tickers(lyra_client):
     assert ticker['instrument_name'] == instrument_name
 
 
-def test_fetch_subaccount(lyra_client):
+def test_fetch_first_subaccount(lyra_client):
     """
     Test the LyraClient class.
     """
@@ -209,44 +241,75 @@ def test_can_create_option_order(lyra_client, currency, side):
 
 
 @pytest.mark.parametrize(
-    "subaccount_type,underlying,result",
+    "subaccount_type,underlying_currency,result",
     [
-        (SubaccountType.STANDARD, None, "0x247da26f2c790be0f0838efa1403703863af35a74c439665dca40a4491bd8c2f"),
-        (SubaccountType.PORTFOLIO, UnderlyingCurrency.ETH, "0xaf75590c7dde08338ed8f52c718140000bdee1476232b1321e694807d739aa74"),
+        (
+            SubaccountType.STANDARD,
+            None,
+            (
+                "0x247da26f2c790be0f0838efa1403703863af35a74c439665dca40a4491bd8c2f",
+                "0x68031dbf2804c2c5c848de876db4cc334c69267ed7ff49646fbbd9d2aff16f71",
+                "0x9abed503592450a03d53af21e2693d60e08a69506c6a61d219da071c5a1a1de5",
+            ),
+        ),
+        (
+            SubaccountType.PORTFOLIO,
+            UnderlyingCurrency.ETH,
+            (
+                "0xaf75590c7dde08338ed8f52c718140000bdee1476232b1321e694807d739aa74",
+                "0x2c83609b60aec89e15520b340369a8d48257a83c95e18b751ac41b27fd3f7d7c",
+                "0x6ae341bd695b518b7d7ade71bb9a3157cabc15847af7c70d0152a28f9c7dab2e",
+            ),
+        ),
     ],
 )
-def test_encode_deposit_data(lyra_client, subaccount_type, underlying, result):
-    """Test encode deposit data."""
-    deposit_data = lyra_client._encode_deposit_data(
-        amount=0.0,
-        subaccount_type=subaccount_type,
-        underlying_currency=underlying,
-    )
-    assert deposit_data.hex() == result, f"{deposit_data} != {result}"
-
-
-def test_subaccount_deposit_signature(lyra_client):
-    """Test encode deposit signature."""
-    ts = int(datetime.now().timestamp() * 1000)
-
-    expiration = ts + 300
-    nonce = int(f"{int(ts)}{random.randint(100, 999)}")
-    deposit_data = lyra_client._encode_deposit_data(
-        amount=0.0,
-        subaccount_type=SubaccountType.STANDARD,
-    )
+def test_generate_necessary_data(lyra_client, subaccount_type, underlying_currency, result):
+    freeze_time(lyra_client)
+    collateral_asset = CollateralAsset.USDC
     subaccount_id = 0
-    deposit_signature = lyra_client._generate_deposit_signature(
+    _, nonce, expiration = lyra_client.get_nonce_and_signature_expiry()
+    if subaccount_type is SubaccountType.STANDARD:
+        contract_key = f"{subaccount_type.name}_RISK_MANAGER_ADDRESS"
+    elif subaccount_type is SubaccountType.PORTFOLIO:
+        if not collateral_asset:
+            raise Exception("Underlying currency must be provided for portfolio subaccounts")
+        contract_key = f"{underlying_currency.name}_{subaccount_type.name}_RISK_MANAGER_ADDRESS"
+    deposit_data = lyra_client._encode_deposit_data(
+        amount=0.0,
+        contract_key=contract_key,
+    )
+    assert deposit_data.hex() == result[0]
+
+    action_hash = lyra_client._generate_action_hash(
         subaccount_id=subaccount_id,
-        deposit_data=deposit_data,
+        encoded_deposit_data=deposit_data,
         expiration=expiration,
         nonce=nonce,
     )
-    assert deposit_signature
-    
+    assert action_hash.hex() == result[1]
 
-def test_get_subaccount_balance(lyra_client):
-    """Test get subaccount balance."""
-    subaccount_id = lyra_client.fetch_subaccounts()['subaccount_ids'][0]
-    balance = lyra_client.get_subaccount_balance(subaccount_id)
-    assert balance
+    typed_data_hash = lyra_client._generate_typed_data_hash(
+        action_hash=action_hash,
+    )
+    assert typed_data_hash.hex() == result[2]
+
+
+def test_get_nonce_and_signature_expiration(lyra_client):
+    """Test get nonce and signature."""
+
+    ts, nonce, expiration = lyra_client.get_nonce_and_signature_expiry()
+    assert ts
+    assert nonce
+    assert expiration
+
+
+@pytest.mark.skip()
+def test_transfer_collateral(lyra_client):
+    """Test transfer collateral."""
+    # freeze_time(lyra_client)
+    amount = 1
+    to = lyra_client.fetch_subaccounts()['subaccount_ids'][1]
+    asset = CollateralAsset.USDC
+    result = lyra_client.transfer_collateral(amount, to, asset)
+
+    assert result

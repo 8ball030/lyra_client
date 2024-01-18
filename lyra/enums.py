@@ -50,6 +50,7 @@ class TimeInForce(Enum):
     GTC = "gtc"
     IOC = "ioc"
     FOK = "fok"
+    POST_ONLY = "post_only"
 
 
 class Environment(Enum):
@@ -68,8 +69,14 @@ class SubaccountType(Enum):
     PORTFOLIO = "portfolio"
 
 
-class TimeInForce(Enum):
-    """Time in force."""
+class CollateralAsset(Enum):
+    """Asset types."""
 
-    GTC = "gtc"
-    POST_ONLY = "post_only"
+    USDC = "usdc"
+
+
+class ActionType(Enum):
+    """Action types."""
+
+    DEPOSIT = "deposit"
+    TRANSFER = "transfer"
