@@ -2,6 +2,7 @@
 Cli module in order to allow interaction.
 """
 import os
+import pandas as pd
 
 import rich_click as click
 from dotenv import load_dotenv
@@ -49,7 +50,9 @@ def set_client(ctx):
         else:
             env = Environment.TEST
 
-        subaccount_id = int(os.environ.get("SUBACCOUNT_ID"))
+        subaccount_id = os.environ.get("SUBACCOUNT_ID", None)
+        if subaccount_id:
+            subaccount_id = int(subaccount_id)
         wallet = os.environ.get("WALLET")
         ctx.client = LyraClient(**auth, env=env, subaccount_id=subaccount_id, wallet=wallet)
 
@@ -212,6 +215,28 @@ def fetch_subaccount(ctx, subaccount_id):
     subaccount = client.fetch_subaccount(subaccount_id=subaccount_id)
     print(subaccount)
 
+    df = pd.DataFrame.from_records(subaccount["collaterals"])
+
+    positions = subaccount["positions"]
+    df = pd.DataFrame.from_records(positions)
+    # Index(['instrument_type', 'instrument_name', 'amount', 'average_price',
+    #        'realized_pnl', 'unrealized_pnl', 'net_settlements',
+    #        'cumulative_funding', 'pending_funding', 'mark_price', 'index_price',
+    #        'delta', 'gamma', 'vega', 'theta', 'mark_value', 'maintenance_margin',
+    #        'initial_margin', 'open_orders_margin', 'leverage',
+    #        'liquidation_price'],
+    #         dtype='object')
+    # we print the positions where we have a non zero amount
+    print("Positions")
+    necessary_columns = ['instrument_name', 'amount', 'average_price', 'mark_price', 'mark_value', 'maintenance_margin', 'initial_margin', 'open_orders_margin', 'leverage', 'liquidation_price']
+    print(df[df['amount'] != 0][necessary_columns])
+    print("Greeks total.")
+    print(df[['delta', 'gamma', 'vega', 'theta']].sum())
+    print("Greeks weighted by mark value.")
+    breakpoint()
+    print(df[['delta', 'gamma', 'vega', 'theta']].multiply(df['mark_value'], axis="index").sum())
+
+
 
 @subaccounts.command("create")
 @click.pass_context
@@ -287,7 +312,14 @@ def create_subaccount(ctx, collateral_asset, underlying_currency, subaccount_typ
     type=click.Choice([f.value for f in OrderStatus]),
     default=None,
 )
-def fetch_orders(ctx, instrument_name, label, page, page_size, status):
+@click.option(
+    "--regex",
+    "-r",
+    type=str,
+    default=None,
+)
+
+def fetch_orders(ctx, instrument_name, label, page, page_size, status, regex):
     """Fetch orders."""
     print("Fetching orders")
     client = ctx.obj["client"]
@@ -298,7 +330,51 @@ def fetch_orders(ctx, instrument_name, label, page, page_size, status):
         page_size=page_size,
         status=status,
     )
-    print(orders)
+    import pandas as pd
+    # apply the regex if exists to filter the orders
+    if regex:
+        orders = [o for o in orders if regex in o["instrument_name"]]
+    df = pd.DataFrame.from_records(orders)
+    instrument_names = df["instrument_name"].unique()
+    print(f"Found {len(instrument_names)} instruments")
+    print(instrument_names)
+    # print the orders
+    # perform some analysis
+    df['amount'] = pd.to_numeric(df['amount'])
+    df['filled_amount'] = pd.to_numeric(df['filled_amount'])
+    df['limit_price'] = pd.to_numeric(df['limit_price'])
+    
+
+    buys = df[df['direction'] == 'buy']
+    sells = df[df['direction'] == 'sell']
+    print("Buys")
+    print(buys)
+    print("Sells")
+    print(sells)
+
+
+    print("Average buy cost")
+    # we determine by the average price of the buys by the amount
+    df['cost'] = buys['limit_price'] * buys['amount']
+    print(df['cost'].sum())
+    amount = buys['amount'].sum()
+    print(amount)
+    buy_total_cost = df['cost'].sum()
+    print(f"Price per unit: {buy_total_cost / amount}")
+    print(buy_total_cost / amount)
+    print("Average sell cost")
+    # we determine by the average price of the buys by the amount
+    df['cost'] = sells['limit_price'] * sells['amount']
+    print(df['cost'].sum())
+    amount = sells['amount'].sum()
+    print(amount)
+    sell_total_cost = df['cost'].sum()
+    print(f"Price per unit: {sell_total_cost / amount}")
+    print(sell_total_cost / amount)
+
+
+
+    
 
 
 @orders.command("cancel")

@@ -29,6 +29,9 @@ from lyra.utils import get_logger
 
 # OPTION_NAME = 'ETH-PERP'
 # OPTION_SUB_ID = '0'
+import pandas as pd
+# we set to show 4 decimal places
+pd.options.display.float_format = '{:,.4f}'.format
 
 
 def to_32byte_hex(val):
@@ -491,7 +494,7 @@ class LyraClient:
         _, nonce, expiration = self.get_nonce_and_signature_expiry()
         transfer = {
             "address": self.contracts["CASH_ASSET"],
-            "amount": int(amount * 1e18),
+            "amount": float(amount),
             "sub_id": 0,
         }
         print(f"Transfering to {to} amount {amount} asset {asset.name}")

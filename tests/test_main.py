@@ -322,9 +322,10 @@ def test_transfer_collateral_steps(
 ):
     """Test transfer collateral."""
     # freeze_time(lyra_client)
-    nonce = 1705769523225595
-    nonce_2 = 1705769523225596
-    expiration = 1705769529225
+    nonce = 1705782758455361
+    nonce_2 = 1705782758455653
+    expiration = 1705782764455
+
     asset = CollateralAsset.USDC
     to = 27060
     amount = 1
@@ -349,7 +350,7 @@ def test_transfer_collateral_steps(
         action_type=ActionType.TRANSFER,
     )
 
-    assert action_hash_1.hex() == "0x66c43228862256527a7c255c40d6a6287814d2a9d5aae46ef6990ffb88cd1b75"
+    assert action_hash_1.hex() == "0xa791107b287aa61f3877cbca40b6dd4c9dc90b7b963c5165558b42ce17cdd0be"
 
     from_signed_action_hash = lyra_client._generate_signed_action(
         action_hash=action_hash_1,
@@ -359,7 +360,7 @@ def test_transfer_collateral_steps(
 
     assert (
         from_signed_action_hash['signature']
-        == "0x16904993c4cebb83f5d5eccdff3818a7aa345a1b71812ebda8e676cc81f33a1207eaf1a3cc073ef08f3e3020112d3ad2b1106ede4a9a3ce17f4b170831c7f2311c"  # noqa: E501
+        == "0x391b636757bf29141c68cf21301222eb2b602bf92ceaeddc6606f72497f45c167e122be27c793052fc3a64ebea85fd4291989002911ac05e180dcfa3a8e3a88b1b"  # noqa: E501
     )
 
     action_hash_2 = lyra_client._generate_action_hash(
@@ -370,7 +371,7 @@ def test_transfer_collateral_steps(
         action_type=ActionType.TRANSFER,
     )
 
-    assert action_hash_2.hex() == "0xd030a732d207c5cdf7e756b642beadfbeb13848781422947e8ab7fd6017cc4e0"
+    assert action_hash_2.hex() == "0x3a65f3b056fa4f91cb41f6eaf865f29edaeb19b1307815d5db22088bdfaf9843"
 
     to_signed_action_hash = lyra_client._generate_signed_action(
         action_hash=action_hash_2,
@@ -380,7 +381,7 @@ def test_transfer_collateral_steps(
 
     assert (
         to_signed_action_hash['signature']
-        == "0xd64afb44c1a23b38c9a23aede07eeea1596f3e79d04f9c4d75e313ee0a4bcc9a6cbd946494a4eebfeb55ac1f8827e3421f7731c931e75700294c9eadcf0cbeed1c"  # noqa: E501
+        == "0x5e8dd66cfab0df0e3718a614d0f732475c8758c5f8327a1dea8e42baf19db3ec3a96102aace018d1871c182b0d5920dc4aca860f34d0fec039fed2eeeccca3521c"  # noqa: E501
     )
     payload = {
         "recipient_details": {
@@ -404,15 +405,15 @@ def test_transfer_collateral_steps(
 
     assert payload == {
         'recipient_details': {
-            'nonce': 1705769523225595,
-            'signature': '0xd64afb44c1a23b38c9a23aede07eeea1596f3e79d04f9c4d75e313ee0a4bcc9a6cbd946494a4eebfeb55ac1f8827e3421f7731c931e75700294c9eadcf0cbeed1c',  # noqa: E501
-            'signature_expiry_sec': 1705769529225,
+            'nonce': nonce,
+            'signature': '0x5e8dd66cfab0df0e3718a614d0f732475c8758c5f8327a1dea8e42baf19db3ec3a96102aace018d1871c182b0d5920dc4aca860f34d0fec039fed2eeeccca3521c',  # noqa: E501
+            'signature_expiry_sec': expiration,
             'signer': '0x3A5c777edf22107d7FdFB3B02B0Cdfe8b75f3453',
         },
         'sender_details': {
-            'nonce': 1705769523225596,
-            'signature': '0x16904993c4cebb83f5d5eccdff3818a7aa345a1b71812ebda8e676cc81f33a1207eaf1a3cc073ef08f3e3020112d3ad2b1106ede4a9a3ce17f4b170831c7f2311c',  # noqa: E501
-            'signature_expiry_sec': 1705769529225,
+            'nonce': nonce_2,
+            'signature': '0x391b636757bf29141c68cf21301222eb2b602bf92ceaeddc6606f72497f45c167e122be27c793052fc3a64ebea85fd4291989002911ac05e180dcfa3a8e3a88b1b',  # noqa: E501
+            'signature_expiry_sec': expiration,
             'signer': '0x3A5c777edf22107d7FdFB3B02B0Cdfe8b75f3453',
         },
         'subaccount_id': 5,
@@ -429,4 +430,4 @@ def test_transfer_collateral_steps(
     response = requests.post(url, json=payload, headers=headers)
 
     print(response.json())
-    breakpoint()
+    assert "error" not in response.json()
