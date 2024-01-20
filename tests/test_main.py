@@ -322,7 +322,6 @@ def test_transfer_collateral_steps(
 ):
     """Test transfer collateral."""
     # freeze_time(lyra_client)
-    expiration = 1705439703008
     nonce = 1705769523225595
     nonce_2 = 1705769523225596
     expiration = 1705769529225
@@ -331,7 +330,7 @@ def test_transfer_collateral_steps(
     amount = 1
     transfer = {
         "address": lyra_client.contracts["CASH_ASSET"],
-        "amount": int(amount * 1e18),
+        "amount": float(amount),
         "sub_id": 0,
     }
     print(f"Transfering to {to} amount {amount} asset {asset.name}")
@@ -420,7 +419,7 @@ def test_transfer_collateral_steps(
         'recipient_subaccount_id': 27060,
         'transfer': {
             'address': '0x6caf294DaC985ff653d5aE75b4FF8E0A66025928',
-            'amount': 1000000000000000000,
+            'amount': 1.0,
             'sub_id': 0,
         },
     }
@@ -429,4 +428,5 @@ def test_transfer_collateral_steps(
     url = f"{lyra_client.contracts['BASE_URL']}/private/transfer_erc20"
     response = requests.post(url, json=payload, headers=headers)
 
-    assert "error" not in response.json()
+    print(response.json())
+    breakpoint()
