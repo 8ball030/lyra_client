@@ -483,23 +483,6 @@ class LyraClient:
         typed_data_hash = self.web3_client.keccak(hexstr=encoded_typed_data_hash)
         return typed_data_hash
 
-    #     def _generate_action_hash(self, subaccount_id: int, nonce: int, expiration: int, encoded_deposit_data: bytes):
-    #         """Handle the deposit to a new subaccount."""
-    #         encoded_action_hash = eth_abi.encode(
-    #             ['bytes32', 'uint256', 'uint256', 'address', 'bytes32', 'uint256', 'address', 'address'],
-    #             [
-    #                 bytes.fromhex(self.contracts['ACTION_TYPEHASH'][2:]),
-    #                 subaccount_id,
-    #                 nonce,
-    #                 self.contracts['DEPOSIT_MODULE_ADDRESS'],
-    #                 encoded_deposit_data,
-    #                 expiration,
-    #                 self.wallet,
-    #                 self.signer.address,
-    #             ],
-    #         )
-    #         return self.web3_client.keccak(encoded_action_hash)
-
     def transfer_collateral(self, amount: int, to: str, asset: CollateralAsset):
         """
         Transfer collateral
@@ -508,20 +491,9 @@ class LyraClient:
         _, nonce, expiration = self.get_nonce_and_signature_expiry()
         transfer = {
             "address": self.contracts["CASH_ASSET"],
-            "amount": int(amount * 1e6),
+            "amount": int(amount * 1e18),
             "sub_id": 0,
         }
-        # encoded_deposit_data = self._encode_deposit_data(
-        #     amount=amount,
-        #     contract_key=f"{asset.name}_RISK_MANAGER_ADDRESS",
-        # )
-        # action_hash = self._generate_action_hash(
-        #     subaccount_id=self.subaccount_id,
-        #     nonce=nonce,
-        #     expiration=expiration,
-        #     encoded_deposit_data=encoded_deposit_data,
-        # )
-
         print(f"Transfering to {to} amount {amount} asset {asset.name}")
 
         encoded_data = self.encode_transfer(
@@ -559,6 +531,9 @@ class LyraClient:
             nonce=nonce_2,
             expiration=expiration,
         )
+
+        print(f"To action hash: {action_hash_2.hex()}")
+        print(f"To signed action hash: {to_signed_action_hash}")
         payload = {
             "recipient_details": {
                 "nonce": nonce,
@@ -576,7 +551,6 @@ class LyraClient:
             "recipient_subaccount_id": to,
             "transfer": transfer,
         }
-        breakpoint()
         payload['sender_details']['signature'] = from_signed_action_hash['signature']
         payload['recipient_details']['signature'] = to_signed_action_hash['signature']
 
@@ -585,14 +559,6 @@ class LyraClient:
         response = requests.post(url, json=payload, headers=headers)
 
         print(response.json())
-        # we send a ws message instead
-        # id = str(int(time.time()))
-        # self.ws.send(json.dumps({'method': 'private/transfer_collateral', 'params': payload, 'id': id}))
-        # while True:
-        #     message = json.loads(self.ws.recv())
-        #     if message['id'] == id:
-        #         breakpoint()
-        #         return message['result']
 
         if "error" in response.json():
             raise Exception(response.json()["error"])

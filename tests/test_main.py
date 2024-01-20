@@ -5,8 +5,10 @@ from itertools import product
 from unittest.mock import MagicMock
 
 import pytest
+import requests
 
 from lyra.enums import (
+    ActionType,
     CollateralAsset,
     Environment,
     InstrumentType,
@@ -311,5 +313,120 @@ def test_transfer_collateral(lyra_client):
     to = lyra_client.fetch_subaccounts()['subaccount_ids'][1]
     asset = CollateralAsset.USDC
     result = lyra_client.transfer_collateral(amount, to, asset)
-
     assert result
+
+
+# we test all of the individual steps of the transfer collateral function
+def test_transfer_collateral_steps(
+    lyra_client,
+):
+    """Test transfer collateral."""
+    # freeze_time(lyra_client)
+    expiration = 1705439703008
+    nonce = 1705769523225595
+    nonce_2 = 1705769523225596
+    expiration = 1705769529225
+    asset = CollateralAsset.USDC
+    to = 27060
+    amount = 1
+    transfer = {
+        "address": lyra_client.contracts["CASH_ASSET"],
+        "amount": int(amount * 1e18),
+        "sub_id": 0,
+    }
+    print(f"Transfering to {to} amount {amount} asset {asset.name}")
+    encoded_data = lyra_client.encode_transfer(
+        amount=amount,
+        to=to,
+    )
+
+    assert encoded_data.hex() == "0xb93e445b4bbee47d11cb559c20c74093b9706023eaefe6e558d685c3be8b402e"
+
+    action_hash_1 = lyra_client._generate_action_hash(
+        subaccount_id=lyra_client.subaccount_id,
+        nonce=nonce,
+        expiration=expiration,
+        encoded_deposit_data=encoded_data,
+        action_type=ActionType.TRANSFER,
+    )
+
+    assert action_hash_1.hex() == "0x66c43228862256527a7c255c40d6a6287814d2a9d5aae46ef6990ffb88cd1b75"
+
+    from_signed_action_hash = lyra_client._generate_signed_action(
+        action_hash=action_hash_1,
+        nonce=nonce,
+        expiration=expiration,
+    )
+
+    assert (
+        from_signed_action_hash['signature']
+        == "0x16904993c4cebb83f5d5eccdff3818a7aa345a1b71812ebda8e676cc81f33a1207eaf1a3cc073ef08f3e3020112d3ad2b1106ede4a9a3ce17f4b170831c7f2311c"  # noqa: E501
+    )
+
+    action_hash_2 = lyra_client._generate_action_hash(
+        subaccount_id=to,
+        nonce=nonce_2,
+        expiration=expiration,
+        encoded_deposit_data=encoded_data,
+        action_type=ActionType.TRANSFER,
+    )
+
+    assert action_hash_2.hex() == "0xd030a732d207c5cdf7e756b642beadfbeb13848781422947e8ab7fd6017cc4e0"
+
+    to_signed_action_hash = lyra_client._generate_signed_action(
+        action_hash=action_hash_2,
+        nonce=nonce_2,
+        expiration=expiration,
+    )
+
+    assert (
+        to_signed_action_hash['signature']
+        == "0xd64afb44c1a23b38c9a23aede07eeea1596f3e79d04f9c4d75e313ee0a4bcc9a6cbd946494a4eebfeb55ac1f8827e3421f7731c931e75700294c9eadcf0cbeed1c"  # noqa: E501
+    )
+    payload = {
+        "recipient_details": {
+            "nonce": nonce,
+            "signature": "string",
+            "signature_expiry_sec": expiration,
+            "signer": lyra_client.signer.address,
+        },
+        "sender_details": {
+            "nonce": nonce_2,
+            "signature": "string",
+            "signature_expiry_sec": expiration,
+            "signer": lyra_client.signer.address,
+        },
+        "subaccount_id": lyra_client.subaccount_id,
+        "recipient_subaccount_id": to,
+        "transfer": transfer,
+    }
+    payload['sender_details']['signature'] = from_signed_action_hash['signature']
+    payload['recipient_details']['signature'] = to_signed_action_hash['signature']
+
+    assert payload == {
+        'recipient_details': {
+            'nonce': 1705769523225595,
+            'signature': '0xd64afb44c1a23b38c9a23aede07eeea1596f3e79d04f9c4d75e313ee0a4bcc9a6cbd946494a4eebfeb55ac1f8827e3421f7731c931e75700294c9eadcf0cbeed1c',  # noqa: E501
+            'signature_expiry_sec': 1705769529225,
+            'signer': '0x3A5c777edf22107d7FdFB3B02B0Cdfe8b75f3453',
+        },
+        'sender_details': {
+            'nonce': 1705769523225596,
+            'signature': '0x16904993c4cebb83f5d5eccdff3818a7aa345a1b71812ebda8e676cc81f33a1207eaf1a3cc073ef08f3e3020112d3ad2b1106ede4a9a3ce17f4b170831c7f2311c',  # noqa: E501
+            'signature_expiry_sec': 1705769529225,
+            'signer': '0x3A5c777edf22107d7FdFB3B02B0Cdfe8b75f3453',
+        },
+        'subaccount_id': 5,
+        'recipient_subaccount_id': 27060,
+        'transfer': {
+            'address': '0x6caf294DaC985ff653d5aE75b4FF8E0A66025928',
+            'amount': 1000000000000000000,
+            'sub_id': 0,
+        },
+    }
+
+    headers = lyra_client._create_signature_headers()
+    url = f"{lyra_client.contracts['BASE_URL']}/private/transfer_erc20"
+    response = requests.post(url, json=payload, headers=headers)
+
+    assert "error" not in response.json()
