@@ -2,8 +2,8 @@
 Cli module in order to allow interaction.
 """
 import os
-import pandas as pd
 
+import pandas as pd
 import rich_click as click
 from dotenv import load_dotenv
 from rich import print
@@ -207,8 +207,20 @@ def fetch_subaccounts(ctx):
     "subaccount_id",
     type=int,
 )
+@click.option(
+    "--underlying-currency",
+    "-u",
+    type=click.Choice([f.value for f in UnderlyingCurrency]),
+    default=UnderlyingCurrency.ETH.value,
+)
+@click.option(
+    "--columns",
+    "-c",
+    type=str,
+    default=None,
+)
 @click.pass_context
-def fetch_subaccount(ctx, subaccount_id):
+def fetch_subaccount(ctx, subaccount_id, underlying_currency, columns):
     """Fetch subaccount."""
     print("Fetching subaccount")
     client = ctx.obj["client"]
@@ -218,24 +230,32 @@ def fetch_subaccount(ctx, subaccount_id):
     df = pd.DataFrame.from_records(subaccount["collaterals"])
 
     positions = subaccount["positions"]
-    df = pd.DataFrame.from_records(positions)
-    # Index(['instrument_type', 'instrument_name', 'amount', 'average_price',
-    #        'realized_pnl', 'unrealized_pnl', 'net_settlements',
-    #        'cumulative_funding', 'pending_funding', 'mark_price', 'index_price',
-    #        'delta', 'gamma', 'vega', 'theta', 'mark_value', 'maintenance_margin',
-    #        'initial_margin', 'open_orders_margin', 'leverage',
-    #        'liquidation_price'],
-    #         dtype='object')
-    # we print the positions where we have a non zero amount
-    print("Positions")
-    necessary_columns = ['instrument_name', 'amount', 'average_price', 'mark_price', 'mark_value', 'maintenance_margin', 'initial_margin', 'open_orders_margin', 'leverage', 'liquidation_price']
-    print(df[df['amount'] != 0][necessary_columns])
-    print("Greeks total.")
-    print(df[['delta', 'gamma', 'vega', 'theta']].sum())
-    print("Greeks weighted by mark value.")
-    breakpoint()
-    print(df[['delta', 'gamma', 'vega', 'theta']].multiply(df['mark_value'], axis="index").sum())
 
+    df = pd.DataFrame.from_records(positions)
+    df["amount"] = pd.to_numeric(df["amount"])
+    delta_columns = ['delta', 'gamma', 'vega', 'theta']
+    for col in delta_columns:
+        df[col] = pd.to_numeric(df[col])
+    if columns:
+        columns = columns.split(",")
+        df = df[[c for c in columns if c not in delta_columns] + delta_columns]
+    print("Positions")
+    open_positions = df[df['amount'] != 0]
+    open_positions = open_positions[open_positions['instrument_name'].str.contains(underlying_currency.upper())]
+    print("Greeks")
+    for col in delta_columns:
+        position_adjustment = open_positions[col] * df.amount
+        open_positions[col] = position_adjustment
+    print("Open positions")
+
+    if columns:
+        print(open_positions[columns])
+    else:
+        print(open_positions)
+
+    # total deltas
+    print("Total deltas")
+    print(open_positions[delta_columns].sum())
 
 
 @subaccounts.command("create")
@@ -318,7 +338,6 @@ def create_subaccount(ctx, collateral_asset, underlying_currency, subaccount_typ
     type=str,
     default=None,
 )
-
 def fetch_orders(ctx, instrument_name, label, page, page_size, status, regex):
     """Fetch orders."""
     print("Fetching orders")
@@ -331,6 +350,7 @@ def fetch_orders(ctx, instrument_name, label, page, page_size, status, regex):
         status=status,
     )
     import pandas as pd
+
     # apply the regex if exists to filter the orders
     if regex:
         orders = [o for o in orders if regex in o["instrument_name"]]
@@ -343,7 +363,6 @@ def fetch_orders(ctx, instrument_name, label, page, page_size, status, regex):
     df['amount'] = pd.to_numeric(df['amount'])
     df['filled_amount'] = pd.to_numeric(df['filled_amount'])
     df['limit_price'] = pd.to_numeric(df['limit_price'])
-    
 
     buys = df[df['direction'] == 'buy']
     sells = df[df['direction'] == 'sell']
@@ -351,7 +370,6 @@ def fetch_orders(ctx, instrument_name, label, page, page_size, status, regex):
     print(buys)
     print("Sells")
     print(sells)
-
 
     print("Average buy cost")
     # we determine by the average price of the buys by the amount
@@ -371,10 +389,6 @@ def fetch_orders(ctx, instrument_name, label, page, page_size, status, regex):
     sell_total_cost = df['cost'].sum()
     print(f"Price per unit: {sell_total_cost / amount}")
     print(sell_total_cost / amount)
-
-
-
-    
 
 
 @orders.command("cancel")

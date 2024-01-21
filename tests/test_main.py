@@ -1,6 +1,9 @@
 """
 Tests for the main function.
 """
+import random
+import time
+from datetime import datetime
 from itertools import product
 from unittest.mock import MagicMock
 
@@ -34,7 +37,9 @@ def freeze_time(lyra_client):
 
 @pytest.fixture
 def lyra_client():
-    return LyraClient(TEST_PRIVATE_KEY, env=Environment.TEST, logger=get_logger())
+    lyra_client = LyraClient(TEST_PRIVATE_KEY, env=Environment.TEST, logger=get_logger())
+    lyra_client.subaccount_id = 5
+    return lyra_client
 
 
 def test_lyra_client(lyra_client):
@@ -305,7 +310,6 @@ def test_get_nonce_and_signature_expiration(lyra_client):
     assert expiration
 
 
-@pytest.mark.skip()
 def test_transfer_collateral(lyra_client):
     """Test transfer collateral."""
     # freeze_time(lyra_client)
@@ -316,22 +320,26 @@ def test_transfer_collateral(lyra_client):
     assert result
 
 
-# we test all of the individual steps of the transfer collateral function
 def test_transfer_collateral_steps(
     lyra_client,
 ):
     """Test transfer collateral."""
     # freeze_time(lyra_client)
-    nonce = 1705782758455361
-    nonce_2 = 1705782758455653
-    expiration = 1705782764455
+    # nonce = 1705782758455361
+    # nonce_2 = 1705782758455653
+    # expiration = 1705782764455
+
+    ts = int(datetime.now().timestamp() * 1000)
+    nonce = int(f"{int(ts)}{random.randint(100, 499)}")
+    nonce_2 = int(f"{int(ts)}{random.randint(500, 999)}")
+    expiration = int(datetime.now().timestamp() + 10000)
 
     asset = CollateralAsset.USDC
     to = 27060
-    amount = 1
+    amount = 10
     transfer = {
         "address": lyra_client.contracts["CASH_ASSET"],
-        "amount": float(amount),
+        "amount": int(amount),
         "sub_id": 0,
     }
     print(f"Transfering to {to} amount {amount} asset {asset.name}")
@@ -340,9 +348,7 @@ def test_transfer_collateral_steps(
         to=to,
     )
 
-    assert encoded_data.hex() == "0xb93e445b4bbee47d11cb559c20c74093b9706023eaefe6e558d685c3be8b402e"
-
-    action_hash_1 = lyra_client._generate_action_hash(
+    send_action_hash = lyra_client._generate_action_hash(
         subaccount_id=lyra_client.subaccount_id,
         nonce=nonce,
         expiration=expiration,
@@ -350,84 +356,82 @@ def test_transfer_collateral_steps(
         action_type=ActionType.TRANSFER,
     )
 
-    assert action_hash_1.hex() == "0xa791107b287aa61f3877cbca40b6dd4c9dc90b7b963c5165558b42ce17cdd0be"
-
     from_signed_action_hash = lyra_client._generate_signed_action(
-        action_hash=action_hash_1,
+        action_hash=send_action_hash,
         nonce=nonce,
         expiration=expiration,
     )
 
-    assert (
-        from_signed_action_hash['signature']
-        == "0x391b636757bf29141c68cf21301222eb2b602bf92ceaeddc6606f72497f45c167e122be27c793052fc3a64ebea85fd4291989002911ac05e180dcfa3a8e3a88b1b"  # noqa: E501
-    )
+    print("signature:" + from_signed_action_hash['signature'])
 
-    action_hash_2 = lyra_client._generate_action_hash(
+    recipient_action_hash = lyra_client._generate_action_hash(
         subaccount_id=to,
         nonce=nonce_2,
         expiration=expiration,
-        encoded_deposit_data=encoded_data,
+        encoded_deposit_data=lyra_client.web3_client.keccak(bytes.fromhex("")),
         action_type=ActionType.TRANSFER,
     )
 
-    assert action_hash_2.hex() == "0x3a65f3b056fa4f91cb41f6eaf865f29edaeb19b1307815d5db22088bdfaf9843"
+    print("recipient_action_hash:" + recipient_action_hash.hex())
 
     to_signed_action_hash = lyra_client._generate_signed_action(
-        action_hash=action_hash_2,
+        action_hash=recipient_action_hash,
         nonce=nonce_2,
         expiration=expiration,
     )
 
-    assert (
-        to_signed_action_hash['signature']
-        == "0x5e8dd66cfab0df0e3718a614d0f732475c8758c5f8327a1dea8e42baf19db3ec3a96102aace018d1871c182b0d5920dc4aca860f34d0fec039fed2eeeccca3521c"  # noqa: E501
-    )
     payload = {
-        "recipient_details": {
+        "subaccount_id": lyra_client.subaccount_id,
+        "recipient_subaccount_id": to,
+        "sender_details": {
             "nonce": nonce,
             "signature": "string",
             "signature_expiry_sec": expiration,
             "signer": lyra_client.signer.address,
         },
-        "sender_details": {
+        "recipient_details": {
             "nonce": nonce_2,
             "signature": "string",
             "signature_expiry_sec": expiration,
             "signer": lyra_client.signer.address,
         },
-        "subaccount_id": lyra_client.subaccount_id,
-        "recipient_subaccount_id": to,
         "transfer": transfer,
     }
     payload['sender_details']['signature'] = from_signed_action_hash['signature']
     payload['recipient_details']['signature'] = to_signed_action_hash['signature']
 
-    assert payload == {
-        'recipient_details': {
-            'nonce': nonce,
-            'signature': '0x5e8dd66cfab0df0e3718a614d0f732475c8758c5f8327a1dea8e42baf19db3ec3a96102aace018d1871c182b0d5920dc4aca860f34d0fec039fed2eeeccca3521c',  # noqa: E501
-            'signature_expiry_sec': expiration,
-            'signer': '0x3A5c777edf22107d7FdFB3B02B0Cdfe8b75f3453',
-        },
-        'sender_details': {
-            'nonce': nonce_2,
-            'signature': '0x391b636757bf29141c68cf21301222eb2b602bf92ceaeddc6606f72497f45c167e122be27c793052fc3a64ebea85fd4291989002911ac05e180dcfa3a8e3a88b1b',  # noqa: E501
-            'signature_expiry_sec': expiration,
-            'signer': '0x3A5c777edf22107d7FdFB3B02B0Cdfe8b75f3453',
-        },
-        'subaccount_id': 5,
-        'recipient_subaccount_id': 27060,
-        'transfer': {
-            'address': '0x6caf294DaC985ff653d5aE75b4FF8E0A66025928',
-            'amount': 1.0,
-            'sub_id': 0,
-        },
-    }
+    pre_account_balance = float(lyra_client.fetch_subaccount(lyra_client.subaccount_id)['collaterals_value'])
 
     headers = lyra_client._create_signature_headers()
     url = f"{lyra_client.contracts['BASE_URL']}/private/transfer_erc20"
+    sub_accounts = lyra_client.fetch_subaccounts()['subaccount_ids']
     response = requests.post(url, json=payload, headers=headers)
 
     print(response.json())
     assert "error" not in response.json()
+
+    # we now wait for the transaction to be mined
+    # we can do this by checking the balance of the account
+    # we should see the balance decrease by the amount we sent
+    # and the balance of the recipient should increase by the amount we sent
+    # we can also check the nonce of the account
+
+    while True:
+        account_balance = float(lyra_client.fetch_subaccount(lyra_client.subaccount_id)['collaterals_value'])
+        if account_balance != pre_account_balance:
+            break
+        else:
+            print(f"waiting for transaction to be mined balance is {account_balance}")
+            time.sleep(1)
+
+    assert account_balance == pre_account_balance - amount
+
+    # we now check if *any* of the subaccounts have a balance of the amount we sent
+    # if they do then the transaction was successful
+    for sub_account in sub_accounts:
+        res = lyra_client.fetch_subaccount(sub_account)
+        sub_account_balance = float(res['collaterals_value'])
+        if sub_account_balance != 0:
+            break
+    else:
+        assert False, "No subaccount has a balance"

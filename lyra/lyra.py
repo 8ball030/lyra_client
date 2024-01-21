@@ -7,6 +7,10 @@ import time
 from datetime import datetime
 
 import eth_abi
+
+# OPTION_NAME = 'ETH-PERP'
+# OPTION_SUB_ID = '0'
+import pandas as pd
 import requests
 from eth_account.messages import encode_defunct
 from rich import print
@@ -27,9 +31,6 @@ from lyra.enums import (
 )
 from lyra.utils import get_logger
 
-# OPTION_NAME = 'ETH-PERP'
-# OPTION_SUB_ID = '0'
-import pandas as pd
 # we set to show 4 decimal places
 pd.options.display.float_format = '{:,.4f}'.format
 
@@ -490,11 +491,17 @@ class LyraClient:
         """
         Transfer collateral
         """
+
+        ts = int(datetime.now().timestamp() * 1000)
+        nonce = int(f"{int(ts)}{random.randint(100, 499)}")
+        nonce_2 = int(f"{int(ts)}{random.randint(500, 999)}")
+        expiration = int(datetime.now().timestamp() + 10000)
+
         url = f"{self.contracts['BASE_URL']}/private/transfer_erc20"
         _, nonce, expiration = self.get_nonce_and_signature_expiry()
         transfer = {
             "address": self.contracts["CASH_ASSET"],
-            "amount": float(amount),
+            "amount": int(amount),
             "sub_id": 0,
         }
         print(f"Transfering to {to} amount {amount} asset {asset.name}")
@@ -521,12 +528,11 @@ class LyraClient:
         print(f"from_signed_action_hash: {from_signed_action_hash}")
         print(f"From action hash: {action_hash_1.hex()}")
 
-        _, nonce_2, _ = self.get_nonce_and_signature_expiry()
         action_hash_2 = self._generate_action_hash(
             subaccount_id=to,
             nonce=nonce_2,
             expiration=expiration,
-            encoded_deposit_data=bytes.fromhex(''),
+            encoded_deposit_data=self.web3_client.keccak(bytes.fromhex('')),
             action_type=ActionType.TRANSFER,
         )
         to_signed_action_hash = self._generate_signed_action(
@@ -538,20 +544,20 @@ class LyraClient:
         print(f"To action hash: {action_hash_2.hex()}")
         print(f"To signed action hash: {to_signed_action_hash}")
         payload = {
-            "recipient_details": {
+            "subaccount_id": self.subaccount_id,
+            "recipient_subaccount_id": to,
+            "sender_details": {
                 "nonce": nonce,
                 "signature": "string",
                 "signature_expiry_sec": expiration,
                 "signer": self.signer.address,
             },
-            "sender_details": {
+            "recipient_details": {
                 "nonce": nonce_2,
                 "signature": "string",
                 "signature_expiry_sec": expiration,
                 "signer": self.signer.address,
             },
-            "subaccount_id": self.subaccount_id,
-            "recipient_subaccount_id": to,
             "transfer": transfer,
         }
         payload['sender_details']['signature'] = from_signed_action_hash['signature']
