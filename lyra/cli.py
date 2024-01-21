@@ -3,11 +3,21 @@ Cli module in order to allow interaction.
 """
 import os
 
+import pandas as pd
 import rich_click as click
 from dotenv import load_dotenv
 from rich import print
 
-from lyra.enums import Environment, InstrumentType, OrderSide, OrderStatus, OrderType, UnderlyingCurrency
+from lyra.enums import (
+    CollateralAsset,
+    Environment,
+    InstrumentType,
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    SubaccountType,
+    UnderlyingCurrency,
+)
 from lyra.lyra import LyraClient
 from lyra.utils import get_logger
 
@@ -40,7 +50,9 @@ def set_client(ctx):
         else:
             env = Environment.TEST
 
-        subaccount_id = os.environ.get("SUBACCOUNT_ID")
+        subaccount_id = os.environ.get("SUBACCOUNT_ID", None)
+        if subaccount_id:
+            subaccount_id = int(subaccount_id)
         wallet = os.environ.get("WALLET")
         ctx.client = LyraClient(**auth, env=env, subaccount_id=subaccount_id, wallet=wallet)
 
@@ -151,7 +163,36 @@ def fetch_tickers(ctx, instrument_name):
     print(ticker)
 
 
-@subaccounts.command("fetch")
+@collateral.command("transfer")
+@click.pass_context
+@click.option(
+    "--amount",
+    "-a",
+    type=float,
+    required=True,
+)
+@click.option(
+    "--to",
+    "-t",
+    type=int,
+    required=True,
+    help="Subaccount ID to transfer to",
+)
+@click.option(
+    "--asset",
+    "-s",
+    type=click.Choice([f.value for f in CollateralAsset]),
+    default=CollateralAsset.USDC.value,
+)
+def transfer_collateral(ctx, amount, to, asset):
+    """Transfer collateral."""
+    client = ctx.obj["client"]
+    result = client.transfer_collateral(amount=amount, to=to, asset=CollateralAsset(asset))
+
+    print(result)
+
+
+@subaccounts.command("all")
 @click.pass_context
 def fetch_subaccounts(ctx):
     """Fetch subaccounts."""
@@ -161,18 +202,102 @@ def fetch_subaccounts(ctx):
     print(subaccounts)
 
 
-@subaccounts.command("info")
-@click.pass_context
+@subaccounts.command("fetch")
 @click.argument(
     "subaccount_id",
     type=int,
 )
-def fetch_subaccount(ctx, subaccount_id):
+@click.option(
+    "--underlying-currency",
+    "-u",
+    type=click.Choice([f.value for f in UnderlyingCurrency]),
+    default=UnderlyingCurrency.ETH.value,
+)
+@click.option(
+    "--columns",
+    "-c",
+    type=str,
+    default=None,
+)
+@click.pass_context
+def fetch_subaccount(ctx, subaccount_id, underlying_currency, columns):
     """Fetch subaccount."""
     print("Fetching subaccount")
     client = ctx.obj["client"]
     subaccount = client.fetch_subaccount(subaccount_id=subaccount_id)
     print(subaccount)
+
+    df = pd.DataFrame.from_records(subaccount["collaterals"])
+
+    positions = subaccount["positions"]
+
+    df = pd.DataFrame.from_records(positions)
+    df["amount"] = pd.to_numeric(df["amount"])
+    delta_columns = ['delta', 'gamma', 'vega', 'theta']
+    for col in delta_columns:
+        df[col] = pd.to_numeric(df[col])
+    if columns:
+        columns = columns.split(",")
+        df = df[[c for c in columns if c not in delta_columns] + delta_columns]
+    print("Positions")
+    open_positions = df[df['amount'] != 0]
+    open_positions = open_positions[open_positions['instrument_name'].str.contains(underlying_currency.upper())]
+    print("Greeks")
+    for col in delta_columns:
+        position_adjustment = open_positions[col] * df.amount
+        open_positions[col] = position_adjustment
+    print("Open positions")
+
+    if columns:
+        print(open_positions[columns])
+    else:
+        print(open_positions)
+
+    # total deltas
+    print("Total deltas")
+    print(open_positions[delta_columns].sum())
+
+
+@subaccounts.command("create")
+@click.pass_context
+@click.option(
+    "--underlying-currency",
+    "-u",
+    type=click.Choice([f.value for f in UnderlyingCurrency]),
+    default=UnderlyingCurrency.ETH.value,
+)
+@click.option(
+    "--subaccount-type",
+    "-s",
+    type=click.Choice([f.value for f in SubaccountType]),
+    default=SubaccountType.PORTFOLIO.value,
+)
+@click.option(
+    "--collateral-asset",
+    "-c",
+    type=click.Choice([f.value for f in CollateralAsset]),
+    default=CollateralAsset.USDC.value,
+)
+@click.option(
+    "--amount",
+    "-a",
+    type=float,
+    default=0,
+)
+def create_subaccount(ctx, collateral_asset, underlying_currency, subaccount_type, amount):
+    """Create subaccount."""
+    underlying_currency = UnderlyingCurrency(underlying_currency)
+    subaccount_type = SubaccountType(subaccount_type)
+    collateral_asset = CollateralAsset(collateral_asset)
+    print(f"Creating subaccount with collateral asset {collateral_asset} and underlying currency {underlying_currency}")
+    client = ctx.obj["client"]
+    subaccount_id = client.create_subaccount(
+        amount=int(amount * 1e6),
+        subaccount_type=subaccount_type,
+        collateral_asset=collateral_asset,
+        underlying_currency=underlying_currency,
+    )
+    print(subaccount_id)
 
 
 @orders.command("fetch")
@@ -207,7 +332,13 @@ def fetch_subaccount(ctx, subaccount_id):
     type=click.Choice([f.value for f in OrderStatus]),
     default=None,
 )
-def fetch_orders(ctx, instrument_name, label, page, page_size, status):
+@click.option(
+    "--regex",
+    "-r",
+    type=str,
+    default=None,
+)
+def fetch_orders(ctx, instrument_name, label, page, page_size, status, regex):
     """Fetch orders."""
     print("Fetching orders")
     client = ctx.obj["client"]
@@ -218,7 +349,46 @@ def fetch_orders(ctx, instrument_name, label, page, page_size, status):
         page_size=page_size,
         status=status,
     )
-    print(orders)
+    import pandas as pd
+
+    # apply the regex if exists to filter the orders
+    if regex:
+        orders = [o for o in orders if regex in o["instrument_name"]]
+    df = pd.DataFrame.from_records(orders)
+    instrument_names = df["instrument_name"].unique()
+    print(f"Found {len(instrument_names)} instruments")
+    print(instrument_names)
+    # print the orders
+    # perform some analysis
+    df['amount'] = pd.to_numeric(df['amount'])
+    df['filled_amount'] = pd.to_numeric(df['filled_amount'])
+    df['limit_price'] = pd.to_numeric(df['limit_price'])
+
+    buys = df[df['direction'] == 'buy']
+    sells = df[df['direction'] == 'sell']
+    print("Buys")
+    print(buys)
+    print("Sells")
+    print(sells)
+
+    print("Average buy cost")
+    # we determine by the average price of the buys by the amount
+    df['cost'] = buys['limit_price'] * buys['amount']
+    print(df['cost'].sum())
+    amount = buys['amount'].sum()
+    print(amount)
+    buy_total_cost = df['cost'].sum()
+    print(f"Price per unit: {buy_total_cost / amount}")
+    print(buy_total_cost / amount)
+    print("Average sell cost")
+    # we determine by the average price of the buys by the amount
+    df['cost'] = sells['limit_price'] * sells['amount']
+    print(df['cost'].sum())
+    amount = sells['amount'].sum()
+    print(amount)
+    sell_total_cost = df['cost'].sum()
+    print(f"Price per unit: {sell_total_cost / amount}")
+    print(sell_total_cost / amount)
 
 
 @orders.command("cancel")
