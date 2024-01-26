@@ -226,6 +226,7 @@ def fetch_subaccount(ctx, subaccount_id, underlying_currency, columns):
     client = ctx.obj["client"]
     subaccount = client.fetch_subaccount(subaccount_id=subaccount_id)
     print(subaccount)
+    pd.set_option('display.precision', 2)
 
     df = pd.DataFrame.from_records(subaccount["collaterals"])
 
@@ -248,7 +249,16 @@ def fetch_subaccount(ctx, subaccount_id, underlying_currency, columns):
         open_positions[col] = position_adjustment
     print("Open positions")
 
+    pd.options.display.float_format = "{:,.2f}".format
+
+    open_positions = open_positions.sort_values(by=['instrument_name'])
     if columns:
+
+        for col in columns:
+            try:
+                col = pd.to_numeric(open_positions[col])
+            except:
+                pass
         print(open_positions[columns])
     else:
         print(open_positions)
@@ -256,6 +266,9 @@ def fetch_subaccount(ctx, subaccount_id, underlying_currency, columns):
     # total deltas
     print("Total deltas")
     print(open_positions[delta_columns].sum())
+
+    print("Subaccount values")
+    print(subaccount['subaccount_value'])
 
 
 @subaccounts.command("create")
@@ -349,8 +362,6 @@ def fetch_orders(ctx, instrument_name, label, page, page_size, status, regex):
         page_size=page_size,
         status=status,
     )
-    import pandas as pd
-
     # apply the regex if exists to filter the orders
     if regex:
         orders = [o for o in orders if regex in o["instrument_name"]]
