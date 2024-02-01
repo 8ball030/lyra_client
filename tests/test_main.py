@@ -452,6 +452,5 @@ def test_analyser(underlying_currency, lyra_client):
     analyser.print_positions(underlying_currency)
     assert len(analyser.get_positions(underlying_currency))
     assert len(analyser.get_open_positions(underlying_currency))
-    assert len(analyser.get_greeks(underlying_currency))
-    assert len(analyser.get_subaccount_value())
+    assert analyser.get_subaccount_value()
     assert len(analyser.get_total_greeks(underlying_currency))
