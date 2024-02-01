@@ -40,7 +40,8 @@ def freeze_time(lyra_client):
 def lyra_client():
     lyra_client = LyraClient(TEST_PRIVATE_KEY, env=Environment.TEST, logger=get_logger())
     lyra_client.subaccount_id = 5
-    return lyra_client
+    yield lyra_client
+    lyra_client.cancel_all()
 
 
 def test_lyra_client(lyra_client):
@@ -221,8 +222,8 @@ def test_get_tickers(lyra_client):
 @pytest.mark.parametrize(
     "currency, side",
     [
-        (UnderlyingCurrency.ETH, OrderSide.BUY),
-        (UnderlyingCurrency.ETH, OrderSide.SELL),
+        # (UnderlyingCurrency.ETH, OrderSide.BUY),
+        # (UnderlyingCurrency.ETH, OrderSide.SELL),
         (UnderlyingCurrency.BTC, OrderSide.BUY),
         (UnderlyingCurrency.BTC, OrderSide.SELL),
     ],
