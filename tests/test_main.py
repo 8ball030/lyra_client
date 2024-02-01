@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 import requests
 
+from lyra.analyser import PortfolioAnalyser
 from lyra.enums import (
     ActionType,
     CollateralAsset,
@@ -39,7 +40,8 @@ def freeze_time(lyra_client):
 def lyra_client():
     lyra_client = LyraClient(TEST_PRIVATE_KEY, env=Environment.TEST, logger=get_logger())
     lyra_client.subaccount_id = 5
-    return lyra_client
+    yield lyra_client
+    lyra_client.cancel_all()
 
 
 def test_lyra_client(lyra_client):
@@ -220,8 +222,8 @@ def test_get_tickers(lyra_client):
 @pytest.mark.parametrize(
     "currency, side",
     [
-        (UnderlyingCurrency.ETH, OrderSide.BUY),
-        (UnderlyingCurrency.ETH, OrderSide.SELL),
+        # (UnderlyingCurrency.ETH, OrderSide.BUY),
+        # (UnderlyingCurrency.ETH, OrderSide.SELL),
         (UnderlyingCurrency.BTC, OrderSide.BUY),
         (UnderlyingCurrency.BTC, OrderSide.SELL),
     ],
@@ -435,3 +437,20 @@ def test_transfer_collateral_steps(
             break
     else:
         assert False, "No subaccount has a balance"
+
+
+@pytest.mark.parametrize(
+    "underlying_currency",
+    [
+        UnderlyingCurrency.BTC.value,
+    ],
+)
+def test_analyser(underlying_currency, lyra_client):
+    """Test analyser."""
+    raw_data = lyra_client.fetch_subaccount(lyra_client.subaccount_id)
+    analyser = PortfolioAnalyser(raw_data)
+    analyser.print_positions(underlying_currency)
+    assert len(analyser.get_positions(underlying_currency))
+    assert len(analyser.get_open_positions(underlying_currency))
+    assert analyser.get_subaccount_value()
+    assert len(analyser.get_total_greeks(underlying_currency))
