@@ -8,6 +8,7 @@ import rich_click as click
 from dotenv import load_dotenv
 from rich import print
 
+from lyra.analyser import PortfolioAnalyser
 from lyra.enums import (
     CollateralAsset,
     Environment,
@@ -22,6 +23,7 @@ from lyra.lyra import LyraClient
 from lyra.utils import get_logger
 
 click.rich_click.USE_RICH_MARKUP = True
+pd.set_option('display.precision', 2)
 
 
 def set_logger(ctx, level):
@@ -223,52 +225,17 @@ def fetch_subaccounts(ctx):
 def fetch_subaccount(ctx, subaccount_id, underlying_currency, columns):
     """Fetch subaccount."""
     print("Fetching subaccount")
+    print(f"Subaccount ID: {subaccount_id}")
+    print(f"Underlying currency: {underlying_currency}")
     client = ctx.obj["client"]
     subaccount = client.fetch_subaccount(subaccount_id=subaccount_id)
-    print(subaccount)
-    pd.set_option('display.precision', 2)
-
-    df = pd.DataFrame.from_records(subaccount["collaterals"])
-
-    positions = subaccount["positions"]
-
-    df = pd.DataFrame.from_records(positions)
-    df["amount"] = pd.to_numeric(df["amount"])
-    delta_columns = ['delta', 'gamma', 'vega', 'theta']
-    for col in delta_columns:
-        df[col] = pd.to_numeric(df[col])
-    if columns:
-        columns = columns.split(",")
-        df = df[[c for c in columns if c not in delta_columns] + delta_columns]
+    analyser = PortfolioAnalyser(subaccount)
     print("Positions")
-    open_positions = df[df['amount'] != 0]
-    open_positions = open_positions[open_positions['instrument_name'].str.contains(underlying_currency.upper())]
-    print("Greeks")
-    for col in delta_columns:
-        position_adjustment = open_positions[col] * df.amount
-        open_positions[col] = position_adjustment
-    print("Open positions")
-
-    pd.options.display.float_format = "{:,.2f}".format
-
-    open_positions = open_positions.sort_values(by=['instrument_name'])
-    if columns:
-
-        for col in columns:
-            try:
-                col = pd.to_numeric(open_positions[col])
-            except:
-                pass
-        print(open_positions[columns])
-    else:
-        print(open_positions)
-
-    # total deltas
-    print("Total deltas")
-    print(open_positions[delta_columns].sum())
-
+    analyser.print_positions(underlying_currency=underlying_currency, columns=columns)
+    print("Total Greeks")
+    print(analyser.get_total_greeks(underlying_currency))
     print("Subaccount values")
-    print(subaccount['subaccount_value'])
+    print(f"Portfolio Value: ${analyser.get_subaccount_value():.2f}")
 
 
 @subaccounts.command("create")

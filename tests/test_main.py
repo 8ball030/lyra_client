@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 import requests
 
+from lyra.analyser import PortfolioAnalyser
 from lyra.enums import (
     ActionType,
     CollateralAsset,
@@ -435,3 +436,21 @@ def test_transfer_collateral_steps(
             break
     else:
         assert False, "No subaccount has a balance"
+
+
+@pytest.mark.parametrize(
+    "underlying_currency",
+    [
+        UnderlyingCurrency.BTC.value,
+    ],
+)
+def test_analyser(underlying_currency, lyra_client):
+    """Test analyser."""
+    raw_data = lyra_client.fetch_subaccount(lyra_client.subaccount_id)
+    analyser = PortfolioAnalyser(raw_data)
+    analyser.print_positions(underlying_currency)
+    assert len(analyser.get_positions(underlying_currency))
+    assert len(analyser.get_open_positions(underlying_currency))
+    assert len(analyser.get_greeks(underlying_currency))
+    assert len(analyser.get_subaccount_value())
+    assert len(analyser.get_total_greeks(underlying_currency))
