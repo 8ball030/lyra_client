@@ -109,6 +109,95 @@ def positions():
     """Interact with positions."""
 
 
+@cli.group("mmp")
+def mmp():
+    """Interact with market making parameters."""
+
+
+@mmp.command("fetch")
+@click.option(
+    "--underlying-currency",
+    "-u",
+    type=click.Choice([f.value for f in UnderlyingCurrency]),
+    default=UnderlyingCurrency.ETH.value,
+)
+@click.option(
+    "--subaccount-id",
+    "-s",
+    type=int,
+    required=True,
+)
+@click.pass_context
+def fetch_mmp(ctx, underlying_currency, subaccount_id):
+    """Fetch market making parameters."""
+    client = ctx.obj["client"]
+    mmp = client.get_mmp_config(subaccount_id=subaccount_id, currency=UnderlyingCurrency(underlying_currency))
+    print(mmp)
+
+
+@mmp.command("set")
+@click.option(
+    "--underlying-currency",
+    "-u",
+    type=click.Choice([f.value for f in UnderlyingCurrency]),
+    default=UnderlyingCurrency.ETH.value,
+)
+@click.option(
+    "--subaccount-id",
+    "-s",
+    type=int,
+    required=True,
+)
+@click.option(
+    "--frozen-time",
+    "-f",
+    type=int,
+    required=True,
+    help="Time interval in ms setting how long the subaccount is frozen after an mmp trigger, "
+    + "if 0 then a manual reset would be required via private/reset_mmp",
+    default=10000,
+)
+@click.option(
+    "--interval",
+    "-i",
+    type=int,
+    required=True,
+    help="Time interval in ms over which the limits are monotored, if 0 then mmp is disabled",
+    default=10000,
+)
+@click.option(
+    "--amount-limit",
+    "-a",
+    type=float,
+    help="Maximum total order amount that can be traded within the mmp_interval across all "
+    + "instruments of the provided currency. The amounts are not netted, so a filled bid "
+    + "of 1 and a filled ask of 2 would count as 3.",
+    default=5,
+)
+@click.option(
+    "--delta-limit",
+    "-d",
+    type=float,
+    help="Maximum total delta that can be traded within the mmp_interval across all instruments "
+    + "of the provided currency. This quantity is netted, so a filled order with +1 delta and "
+    + "a filled order with -2 delta would count as 3",
+    default=2,
+)
+@click.pass_context
+def set_mmp(ctx, underlying_currency, subaccount_id, frozen_time, interval, amount_limit, delta_limit):
+    """Set market making parameters."""
+    client = ctx.obj["client"]
+    mmp = client.set_mmp_config(
+        subaccount_id=subaccount_id,
+        currency=UnderlyingCurrency(underlying_currency),
+        mmp_frozen_time=frozen_time,
+        mmp_interval=interval,
+        mmp_amount_limit=amount_limit,
+        mmp_delta_limit=delta_limit,
+    )
+    print(mmp)
+
+
 @positions.command("fetch")
 @click.pass_context
 def fetch_positions(ctx):

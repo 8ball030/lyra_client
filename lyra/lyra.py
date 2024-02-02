@@ -657,3 +657,38 @@ class LyraClient:
             "signature_expiry_sec": expiration,
             "signer": self.signer.address,
         }
+
+    def get_mmp_config(self, subaccount_id: int, currency: UnderlyingCurrency = None):
+        """Get the mmp config."""
+        url = f"{self.contracts['BASE_URL']}/private/get_mmp_config"
+        payload = {"subaccount_id": self.subaccount_id}
+        if currency:
+            payload['currency'] = currency.name
+        headers = self._create_signature_headers()
+        response = requests.post(url, json=payload, headers=headers)
+        results = response.json()["result"]
+        return results
+
+    def set_mmp_config(
+        self,
+        subaccount_id,
+        currency: UnderlyingCurrency,
+        mmp_frozen_time: int,
+        mmp_interval: int,
+        mmp_amount_limit: str,
+        mmp_delta_limit: str,
+    ):
+        """Set the mmp config."""
+        url = f"{self.contracts['BASE_URL']}/private/set_mmp_config"
+        payload = {
+            "subaccount_id": subaccount_id,
+            "currency": currency.name,
+            "mmp_frozen_time": mmp_frozen_time,
+            "mmp_interval": mmp_interval,
+            "mmp_amount_limit": mmp_amount_limit,
+            "mmp_delta_limit": mmp_delta_limit,
+        }
+        headers = self._create_signature_headers()
+        response = requests.post(url, json=payload, headers=headers)
+        results = response.json()["result"]
+        return results
