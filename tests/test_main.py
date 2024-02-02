@@ -454,3 +454,28 @@ def test_analyser(underlying_currency, lyra_client):
     assert len(analyser.get_open_positions(underlying_currency))
     assert analyser.get_subaccount_value()
     assert len(analyser.get_total_greeks(underlying_currency))
+
+
+def test_get_mmp_config(lyra_client):
+    """Test get mmp config."""
+    config = lyra_client.get_mmp_config(lyra_client.subaccount_id)
+    assert isinstance(config, list)
+
+
+def test_set_mmp_config(lyra_client):
+    """Test set mmp config."""
+    config = {
+        "subaccount_id": lyra_client.subaccount_id,
+        "currency": UnderlyingCurrency.ETH,
+        "mmp_frozen_time": 0,
+        "mmp_interval": 10_000,
+        "mmp_amount_limit": 10,
+        "mmp_delta_limit": 0.1,
+    }
+    lyra_client.set_mmp_config(**config)
+    set_config = lyra_client.get_mmp_config(lyra_client.subaccount_id, UnderlyingCurrency.ETH)[0]
+    for k, v in config.items():
+        if k == "currency":
+            assert set_config[k] == v.name
+        else:
+            assert float(set_config[k]) == v
