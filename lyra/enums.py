@@ -80,3 +80,9 @@ class ActionType(Enum):
 
     DEPOSIT = "deposit"
     TRANSFER = "transfer"
+
+
+class RfqStatus(Enum):
+    """RFQ statuses."""
+
+    OPEN = "open"

@@ -422,6 +422,7 @@ def fetch_orders(ctx, instrument_name, label, page, page_size, status, regex):
     if regex:
         orders = [o for o in orders if regex in o["instrument_name"]]
     df = pd.DataFrame.from_records(orders)
+    print(orders[0])
     instrument_names = df["instrument_name"].unique()
     print(f"Found {len(instrument_names)} instruments")
     print(instrument_names)
