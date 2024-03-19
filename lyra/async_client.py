@@ -8,14 +8,8 @@ import sys
 import time
 import traceback
 
-from lyra.constants import PUBLIC_HEADERS
 from lyra.enums import InstrumentType, UnderlyingCurrency
 from lyra.ws_client import WsClient as BaseClient
-
-from multiprocessing import Process
-# we need a thread safe way to collect the events
-from multiprocessing import Lock
-from threading import Thread
 
 
 class AsyncClient(BaseClient):
@@ -28,8 +22,6 @@ class AsyncClient(BaseClient):
 
     listener = None
     subscribing = False
-
-
 
     async def fetch_ticker(self, instrument_name: str):
         """
@@ -44,12 +36,9 @@ class AsyncClient(BaseClient):
             response = self.ws.recv()
             response = json.loads(response)
             if response["id"] == id:
-                close = float(response["result"]["best_bid_price"])  + float(response["result"]["best_ask_price"]) / 2
+                close = float(response["result"]["best_bid_price"]) + float(response["result"]["best_ask_price"]) / 2
                 response["result"]["close"] = close
                 return response["result"]
-            
-
-
 
     async def subscribe(self, instrument_name: str, group: str = "1", depth: str = "100"):
         """
@@ -59,24 +48,16 @@ class AsyncClient(BaseClient):
         self.subscribing = True
         if instrument_name not in self.current_subscriptions:
             channel = f"orderbook.{instrument_name}.{group}.{depth}"
-            msg = json.dumps({
-                "method": "subscribe", 
-                "params": {
-                    "channels": [channel]
-                }
-
-                })
+            msg = json.dumps({"method": "subscribe", "params": {"channels": [channel]}})
             print(f"Subscribing with {msg}")
             self.ws.send(msg)
             await self.collect_events(instrument_name=instrument_name)
             print(f"Subscribed to {instrument_name}")
             return
-        
+
         while instrument_name not in self.current_subscriptions:
             await asyncio.sleep(1)
         return self.current_subscriptions[instrument_name]
-        
-    
 
     async def collect_events(self, subscription: str = None, instrument_name: str = None):
         """Use a thread to check the subscriptions"""
@@ -96,7 +77,6 @@ class AsyncClient(BaseClient):
                             raise Exception(value["error"])
                     self.subscribing = False
                     return
-
 
             channel = response["params"]["channel"]
 
@@ -125,10 +105,9 @@ class AsyncClient(BaseClient):
         Watch the order book for a symbol
         orderbook.{instrument_name}.{group}.{depth}
         """
-        
+
         if not self.subscribing:
             await self.subscribe(instrument_name, group, depth)
-
 
         if not self.listener:
             print(f"Started listener for {instrument_name}")
@@ -141,8 +120,12 @@ class AsyncClient(BaseClient):
 
         return self.current_subscriptions[instrument_name]
 
-    
-    async def fetch_instruments(self, expired=False, instrument_type: InstrumentType = InstrumentType.PERP, currency: UnderlyingCurrency = UnderlyingCurrency.BTC):
+    async def fetch_instruments(
+        self,
+        expired=False,
+        instrument_type: InstrumentType = InstrumentType.PERP,
+        currency: UnderlyingCurrency = UnderlyingCurrency.BTC,
+    ):
         return super().fetch_instruments(expired, instrument_type, currency)
 
     async def close(self):
@@ -152,3 +135,37 @@ class AsyncClient(BaseClient):
         self.ws.close()
         # if self.listener:
         #     self.listener.join()
+
+    async def fetch_tickers(
+        self,
+        instrument_type: InstrumentType = InstrumentType.OPTION,
+        currency: UnderlyingCurrency = UnderlyingCurrency.BTC,
+    ):
+        instruments = await self.fetch_instruments(instrument_type=instrument_type, currency=currency)
+        instrument_names = [i['instrument_name'] for i in instruments]
+        id_base = str(int(time.time()))
+        ids_to_instrument_names = {
+            f'{id_base}_{enumerate}': instrument_name for enumerate, instrument_name in enumerate(instrument_names)
+        }
+        for id, instrument_name in ids_to_instrument_names.items():
+            payload = {"instrument_name": instrument_name}
+            self.ws.send(json.dumps({'method': 'public/get_ticker', 'params': payload, 'id': id}))
+            await asyncio.sleep(0.05)  # otherwise we get rate limited...
+        results = {}
+        while ids_to_instrument_names:
+            message = json.loads(self.ws.recv())
+            if message['id'] in ids_to_instrument_names:
+                results[message['result']['instrument_name']] = message['result']
+                del ids_to_instrument_names[message['id']]
+        return results
+
+    async def get_collaterals(self):
+        return super().get_collaterals()
+
+    async def get_positions(self, currency: UnderlyingCurrency = UnderlyingCurrency.BTC):
+        return super().get_positions()
+
+    async def get_open_orders(self, status, currency: UnderlyingCurrency = UnderlyingCurrency.BTC):
+        return super().fetch_orders(
+            status=status,
+        )

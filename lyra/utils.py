@@ -3,12 +3,8 @@ Utils for the lyra package.
 """
 import logging
 import sys
-import os 
 
 from rich.logging import RichHandler
-
-# install_location = os.path.dirname(os.path.realpath(__file__))
-# sys.path.append(install_location)
 
 
 def get_logger():

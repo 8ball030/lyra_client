@@ -17,57 +17,31 @@ from lyra.constants import CONTRACTS, PUBLIC_HEADERS, TEST_PRIVATE_KEY
 from lyra.enums import (
     ActionType,
     CollateralAsset,
+    Environment,
     InstrumentType,
     OrderSide,
     OrderStatus,
     OrderType,
+    RfqStatus,
     SubaccountType,
     TimeInForce,
     UnderlyingCurrency,
-    Environment
 )
 from lyra.utils import get_logger
-import sys
-import os
-from pathlib import Path
-
-# we get the install location
-# install_location = os.path.dirname(os.path.realpath(__file__))
-# sys.path.append(str(Path(install_location) / "autonomy"))
-# breakpoint()
-# from packages.eightballer.protocols.markets.custom_types import Market
-
-def to_market(api_result):
-    """Convert to a market object.
-    raw_resulot = {'instrument_type': 'perp', 'instrument_name': 'BTC-PERP', 'scheduled_activation': 1699035945, 'scheduled_deactivation': 9223372036854775807, 'is_active': True, 'tick_size': '0.1', 'minimum_amount': '0.01', 'maximum_amount': '10000', 'amount_step': '0.001', 'mark_price_fee_rate_cap': '0', 'maker_fee_rate': '0.0005', 'taker_fee_rate': '0.001', 'base_fee': '1.5', 'base_currency': 'BTC', 'quote_currency': 'USD', 'option_details': None, 'perp_details': {'index': 'BTC-USD', 'max_rate_per_hour': '0.1', 'min_rate_per_hour': '-0.1', 'static_interest_rate': '0', 'aggregate_funding': '244.249950785486024857', 'funding_rate': '-0.0000125'}, 'base_asset_address': '0xAFB6Bb95cd70D5367e2C39e9dbEb422B9815339D', 'base_asset_sub_id': '0'}
-    
-    """
-
-    market = Market(
-        id=api_result['instrument_name'],
-        lowercaseId=api_result['instrument_name'].lower(),
-        symbol=api_result['instrument_name'],
-        base=api_result['base_currency'],
-        quote=api_result['quote_currency'],
-        settle=api_result['quote_currency'],
-        baseId=api_result['base_currency'],
-        quoteId=api_result['quote_currency'],
-        settleId=api_result['quote_currency'],
-        type=api_result['instrument_type'],
-        future=api_result['instrument_type'] == InstrumentType.PERP,
-        option=api_result['instrument_type'] == InstrumentType.OPTION,
-        active=api_result['is_active'],
-        taker=api_result['taker_fee_rate'],
-        maker=api_result['maker_fee_rate'],
-    )
-    return market
-
 
 
 class BaseClient:
     """Client for the lyra dex."""
 
-    def __init__(self, private_key: str = TEST_PRIVATE_KEY, env: Environment = Environment.TEST, logger=None, verbose=False, subaccount_id=None, wallet=None):
+    def __init__(
+        self,
+        private_key: str = TEST_PRIVATE_KEY,
+        env: Environment = Environment.TEST,
+        logger=None,
+        verbose=False,
+        subaccount_id=None,
+        wallet=None,
+    ):
         """
         Initialize the LyraClient class.
         """
@@ -141,11 +115,7 @@ class BaseClient:
         }
         response = requests.post(url, json=payload, headers=PUBLIC_HEADERS)
         results = response.json()["result"]
-
-        return [
-            to_market(market)
-            for market in results
-        ]
+        return results
 
     def fetch_subaccounts(self):
         """
@@ -283,6 +253,49 @@ class BaseClient:
         typed_data_hash = self.web3_client.keccak(hexstr=encoded_typed_data_hash)
         order['signature'] = self.signer.signHash(typed_data_hash).signature.hex()
         return order
+
+    def _sign_quote(self, quote):
+        """
+        Sign the quote
+        """
+        rfq_module_data = self._encode_quote_data(quote)
+        return self._sign_quote_data(quote, rfq_module_data)
+
+    def _encode_quote_data(self, quote, underlying_currency: UnderlyingCurrency = UnderlyingCurrency.ETH):
+        """
+        Convert the quote to encoded data.
+        """
+        instruments = self.fetch_instruments(instrument_type=InstrumentType.OPTION, currency=underlying_currency)
+        ledgs_to_subids = {i['instrument_name']: i['base_asset_sub_id'] for i in instruments}
+        dir_sign = 1 if quote['direction'] == 'buy' else -1
+        quote['price'] = '10'
+
+        def encode_leg(leg):
+            print(quote)
+            sub_id = ledgs_to_subids[leg['instrument_name']]
+            leg_sign = 1 if leg['direction'] == 'buy' else -1
+            signed_amount = self.web3_client.to_wei(leg['amount'], 'ether') * leg_sign * dir_sign
+            return [
+                self.contracts[f"{underlying_currency.name}_OPTION_ADDRESS"],
+                sub_id,
+                self.web3_client.to_wei(quote['price'], 'ether'),
+                signed_amount,
+            ]
+
+        encoded_legs = [encode_leg(leg) for leg in quote['legs']]
+        rfq_data = [self.web3_client.to_wei(quote['max_fee'], 'ether'), encoded_legs]
+
+        encoded_data = eth_abi.encode(
+            # ['uint256(address,uint256,uint256,int256)[]'],
+            [
+                'uint256',
+                'address',
+                'uint256',
+                'int256',
+            ],
+            [rfq_data],
+        )
+        return self.web3_client.keccak(encoded_data)
 
     def login_client(
         self,
@@ -704,3 +717,78 @@ class BaseClient:
         response = requests.post(url, json=payload, headers=headers)
         results = response.json()["result"]
         return results
+
+    def send_rfq(self, rfq):
+        """Send an RFQ."""
+        url = f"{self.contracts['BASE_URL']}/private/send_rfq"
+        headers = self._create_signature_headers()
+        response = requests.post(url, json=rfq, headers=headers)
+        results = response.json()["result"]
+        return results
+
+    def poll_rfqs(self):
+        """
+        Poll RFQs.
+            type RfqResponse = {
+              subaccount_id: number,
+              creation_timestamp: number,
+              last_update_timestamp: number,
+              status: string,
+              cancel_reason: string,
+              rfq_id: string,
+              valid_until: number,
+              legs: Array<RfqLeg>
+            }
+        """
+        url = f"{self.contracts['BASE_URL']}/private/poll_rfqs"
+        headers = self._create_signature_headers()
+        params = {
+            "subaccount_id": self.subaccount_id,
+            "status": RfqStatus.OPEN.value,
+        }
+        response = requests.post(url, headers=headers, params=params)
+        results = response.json()["result"]
+        return results
+
+    def send_quote(self, quote):
+        """Send a quote."""
+        url = f"{self.contracts['BASE_URL']}/private/send_quote"
+        headers = self._create_signature_headers()
+        response = requests.post(url, json=quote, headers=headers)
+        results = response.json()["result"]
+        return results
+
+    #   pricedLegs[0].price = direction == 'buy' ? '160' : '180';
+    #   pricedLegs[1].price = direction == 'buy' ? '70' : '50';
+    #   return {
+    #     subaccount_id: subaccount_id_maker,
+    #     rfq_id: rfq_response.rfq_id,
+    #     legs: pricedLegs,
+    #     direction: direction,
+    #     max_fee: '10',
+    #     nonce: Number(`${Date.now()}${Math.round(Math.random() * 999)}`),
+    #     signer: wallet.address,
+    #     signature_expiry_sec: Math.floor(Date.now() / 1000 + 350),
+    #     signature: "filled_in_below"
+    #   };
+    # }
+
+    def create_quote_object(
+        self,
+        rfq_id,
+        legs,
+        direction,
+    ):
+        """Create a quote object."""
+        _, nonce, expiration = self.get_nonce_and_signature_expiry()
+        return {
+            "subaccount_id": self.subaccount_id,
+            "rfq_id": rfq_id,
+            "legs": legs,
+            "direction": direction,
+            "max_fee": '10.0',
+            "nonce": nonce,
+            "signer": self.signer.address,
+            "signature_expiry_sec": expiration,
+            "signature": "filled_in_below",
+        }

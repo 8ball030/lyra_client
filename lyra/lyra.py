@@ -18,19 +18,16 @@ def to_32byte_hex(val):
 
 class LyraClient(BaseClient):
     """Client for the lyra dex."""
+
     http_client: HttpClient
 
     def _create_signature_headers(self):
         """Generate the signature headers."""
         return self.http_client._create_signature_headers()
 
-
     def __init__(self, *args, **kwargs):
         self.http_client = HttpClient(
-            *args, **kwargs,
+            *args,
+            **kwargs,
         )
         super().__init__(*args, **kwargs)
-
-
-
-

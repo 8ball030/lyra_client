@@ -5,12 +5,12 @@ Base class for HTTP client.
 import time
 
 from eth_account.messages import encode_defunct
-from lyra.base_client import BaseClient
 from web3 import Web3
+
+from lyra.base_client import BaseClient
 
 
 class HttpClient(BaseClient):
-
     def _create_signature_headers(self):
         """
         Create the signature headers

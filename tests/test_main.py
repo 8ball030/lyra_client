@@ -19,8 +19,7 @@ from lyra.enums import (
     SubaccountType,
     UnderlyingCurrency,
 )
-from tests.conftest import TEST_WALLET
-
+from tests.conftest import TEST_WALLET, freeze_time
 
 
 def test_lyra_client(lyra_client):
