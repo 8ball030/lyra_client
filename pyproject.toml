@@ -15,7 +15,6 @@ setuptools = "^68.2.2"
 rich-click = "^1.7.1"
 python-dotenv = ">=0.14.0,<0.18.0"
 pandas = "~1"
-open-aea-ledger-ethereum = "1.35.0"
 
 
 [tool.poetry.scripts]
