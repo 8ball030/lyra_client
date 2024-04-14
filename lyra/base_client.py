@@ -60,8 +60,6 @@ class BaseClient:
         else:
             self.subaccount_id = subaccount_id
         print(f"Using subaccount id: {self.subaccount_id}")
-        self.ws = self.connect_ws()
-        self.login_client()
 
     def sign_authentication_header(self):
         timestamp = str(int(time.time() * 1000))
@@ -78,7 +76,7 @@ class BaseClient:
         }
 
     def connect_ws(self):
-        ws = create_connection(self.contracts['WS_ADDRESS'])
+        ws = create_connection(self.contracts['WS_ADDRESS'], enable_multithread=True, timeout=60)
         return ws
 
     def create_account(self, wallet):
@@ -364,6 +362,7 @@ class BaseClient:
         """
         id = str(int(time.time()))
         payload = {"subaccount_id": self.subaccount_id}
+        self.login_client()
         self.ws.send(json.dumps({'method': 'private/cancel_all', 'params': payload, 'id': id}))
         while True:
             message = json.loads(self.ws.recv())

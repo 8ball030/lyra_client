@@ -4,11 +4,15 @@ Async client for Lyra
 
 import asyncio
 import json
-import sys
 import time
-import traceback
+from datetime import datetime
 
-from lyra.enums import InstrumentType, UnderlyingCurrency
+import aiohttp
+from web3 import Web3
+
+from lyra.constants import CONTRACTS, TEST_PRIVATE_KEY
+from lyra.enums import Environment, InstrumentType, OrderSide, OrderType, TimeInForce, UnderlyingCurrency
+from lyra.utils import get_logger
 from lyra.ws_client import WsClient as BaseClient
 
 
@@ -22,6 +26,34 @@ class AsyncClient(BaseClient):
 
     listener = None
     subscribing = False
+
+    def __init__(
+        self,
+        private_key: str = TEST_PRIVATE_KEY,
+        env: Environment = Environment.TEST,
+        logger=None,
+        verbose=False,
+        subaccount_id=None,
+        wallet=None,
+    ):
+        """
+        Initialize the LyraClient class.
+        """
+        self.verbose = verbose
+        self.env = env
+        self.contracts = CONTRACTS[env]
+        self.logger = logger or get_logger()
+        self.web3_client = Web3()
+        self.signer = self.web3_client.eth.account.from_key(private_key)
+        self.wallet = self.signer.address if not wallet else wallet
+        print(f"Signing address: {self.signer.address}")
+        if wallet:
+            print(f"Using wallet: {wallet}")
+        self.subaccount_id = subaccount_id
+        print(f"Using subaccount id: {self.subaccount_id}")
+        self.ws = None
+        self.message_queues = {}
+        self.connecting = False
 
     async def fetch_ticker(self, instrument_name: str):
         """
@@ -40,65 +72,103 @@ class AsyncClient(BaseClient):
                 response["result"]["close"] = close
                 return response["result"]
 
+    def get_subscription_id(self, instrument_name: str, group: str = "1", depth: str = "100"):
+        return f"orderbook.{instrument_name}.{group}.{depth}"
+
     async def subscribe(self, instrument_name: str, group: str = "1", depth: str = "100"):
         """
         Subscribe to the order book for a symbol
         """
-
-        self.subscribing = True
-        if instrument_name not in self.current_subscriptions:
-            channel = f"orderbook.{instrument_name}.{group}.{depth}"
-            msg = json.dumps({"method": "subscribe", "params": {"channels": [channel]}})
-            print(f"Subscribing with {msg}")
-            self.ws.send(msg)
-            await self.collect_events(instrument_name=instrument_name)
-            print(f"Subscribed to {instrument_name}")
+        # if self.listener is None or self.listener.done():
+        asyncio.create_task(self.listen_for_messages())
+        channel = self.get_subscription_id(instrument_name, group, depth)
+        if channel not in self.message_queues:
+            self.message_queues[channel] = asyncio.Queue()
+            msg = {"method": "subscribe", "params": {"channels": [channel]}}
+            await self.ws.send_json(msg)
             return
 
         while instrument_name not in self.current_subscriptions:
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.01)
         return self.current_subscriptions[instrument_name]
 
-    async def collect_events(self, subscription: str = None, instrument_name: str = None):
-        """Use a thread to check the subscriptions"""
-        try:
-            response = self.ws.recv()
-            response = json.loads(response)
-            if "error" in response:
-                print(response)
-                raise Exception(response["error"])
-            if "result" in response:
-                result = response["result"]
+    async def connect_ws(self):
+        self.connecting = True
+        session = aiohttp.ClientSession()
+        ws = await session.ws_connect(self.contracts['WS_ADDRESS'])
+        self.ws = ws
+        self.connecting = False
+        return ws
+
+    async def listen_for_messages(
+        self,
+    ):
+        while True:
+            try:
+                msg = await self.ws.receive_json()
+            except TypeError:
+                continue
+            if "error" in msg:
+                print(msg)
+                raise Exception(msg["error"])
+            if "result" in msg:
+                result = msg["result"]
                 if "status" in result:
-                    print(f"Succesfully subscribed to {result['status']}")
+                    # print(f"Succesfully subscribed to {result['status']}")
                     for channel, value in result['status'].items():
-                        print(f"Channel {channel} has value {value}")
+                        # print(f"Channel {channel} has value {value}")
                         if "error" in value:
-                            raise Exception(value["error"])
-                    self.subscribing = False
-                    return
+                            raise Exception(f"Subscription error for channel: {channel} error: {value['error']}")
+                    continue
+            #  default to putting the message in the queue
+            subscription = msg['params']['channel']
+            data = msg['params']['data']
+            self.handle_message(subscription, data)
 
-            channel = response["params"]["channel"]
+    async def login_client(
+        self,
+    ):
+        login_request = {
+            'method': 'public/login',
+            'params': self.sign_authentication_header(),
+            'id': str(int(time.time())),
+        }
+        await self.ws.send_json(login_request)
+        async for data in self.ws:
+            message = json.loads(data.data)
+            if message['id'] == login_request['id']:
+                if "result" not in message:
+                    raise Exception(f"Unable to login {message}")
+                break
 
-            bids = response['params']['data']['bids']
-            asks = response['params']['data']['asks']
+    def handle_message(self, subscription, data):
+        bids = data['bids']
+        asks = data['asks']
 
-            bids = list(map(lambda x: (float(x[0]), float(x[1])), bids))
-            asks = list(map(lambda x: (float(x[0]), float(x[1])), asks))
+        bids = list(map(lambda x: (float(x[0]), float(x[1])), bids))
+        asks = list(map(lambda x: (float(x[0]), float(x[1])), asks))
 
-            if instrument_name in self.current_subscriptions:
-                old_params = self.current_subscriptions[instrument_name]
-                _asks, _bids = old_params["asks"], old_params["bids"]
-                if not asks:
-                    asks = _asks
-                if not bids:
-                    bids = _bids
-            self.current_subscriptions[instrument_name] = {"asks": asks, "bids": bids}
-            return self.current_subscriptions[instrument_name]
-        except Exception as e:
-            print(f"Error: {e}")
-            print(traceback.print_exc())
-            sys.exit(1)
+        instrument_name = subscription.split(".")[1]
+
+        if subscription in self.current_subscriptions:
+            old_params = self.current_subscriptions[subscription]
+            _asks, _bids = old_params["asks"], old_params["bids"]
+            if not asks:
+                asks = _asks
+            if not bids:
+                bids = _bids
+        timestamp = data['timestamp']
+        datetime_str = datetime.fromtimestamp(timestamp / 1000)
+        nonce = data['publish_id']
+        self.current_subscriptions[instrument_name] = {
+            "asks": asks,
+            "bids": bids,
+            "timestamp": timestamp,
+            "datetime": datetime_str.isoformat(),
+            "nonce": nonce,
+            "symbol": instrument_name,
+        }
+        return self.current_subscriptions[instrument_name]
 
     async def watch_order_book(self, instrument_name: str, group: str = "1", depth: str = "100"):
         """
@@ -106,17 +176,19 @@ class AsyncClient(BaseClient):
         orderbook.{instrument_name}.{group}.{depth}
         """
 
-        if not self.subscribing:
+        if not self.ws and not self.connecting:
+            await self.connect_ws()
+            await self.login_client()
+
+        subscription = self.get_subscription_id(instrument_name, group, depth)
+
+        if subscription not in self.message_queues:
+            while any([self.subscribing, self.ws is None, self.connecting]):
+                await asyncio.sleep(1)
             await self.subscribe(instrument_name, group, depth)
 
-        if not self.listener:
-            print(f"Started listener for {instrument_name}")
-            self.listener = True
-
-        await self.collect_events(instrument_name=instrument_name)
-        while instrument_name not in self.current_subscriptions:
-            await asyncio.sleep(1)
-            print(f"Waiting for {instrument_name} to be in current subscriptions")
+        while instrument_name not in self.current_subscriptions and not self.connecting:
+            await asyncio.sleep(0.01)
 
         return self.current_subscriptions[instrument_name]
 
@@ -133,8 +205,6 @@ class AsyncClient(BaseClient):
         Close the connection
         """
         self.ws.close()
-        # if self.listener:
-        #     self.listener.join()
 
     async def fetch_tickers(
         self,
@@ -169,3 +239,40 @@ class AsyncClient(BaseClient):
         return super().fetch_orders(
             status=status,
         )
+
+    async def create_order(
+        self,
+        price,
+        amount,
+        instrument_name: str,
+        reduce_only=False,
+        side: OrderSide = OrderSide.BUY,
+        order_type: OrderType = OrderType.LIMIT,
+        time_in_force: TimeInForce = TimeInForce.GTC,
+    ):
+        """
+        Create the order.
+        """
+        if side.name.upper() not in OrderSide.__members__:
+            raise Exception(f"Invalid side {side}")
+        order = self._define_order(
+            instrument_name=instrument_name,
+            price=price,
+            amount=amount,
+            side=side,
+        )
+        _currency = UnderlyingCurrency[instrument_name.split("-")[0]]
+        if instrument_name.split("-")[1] == "PERP":
+            instruments = await self.fetch_instruments(instrument_type=InstrumentType.PERP, currency=_currency)
+            instruments = {i['instrument_name']: i for i in instruments}
+            base_asset_sub_id = instruments[instrument_name]['base_asset_sub_id']
+            instrument_type = InstrumentType.PERP
+        else:
+            instruments = await self.fetch_instruments(instrument_type=InstrumentType.OPTION, currency=_currency)
+            instruments = {i['instrument_name']: i for i in instruments}
+            base_asset_sub_id = instruments[instrument_name]['base_asset_sub_id']
+            instrument_type = InstrumentType.OPTION
+
+        signed_order = self._sign_order(order, base_asset_sub_id, instrument_type, _currency)
+        response = self.submit_order(signed_order)
+        return response

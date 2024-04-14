@@ -6,7 +6,7 @@ from rich import print
 
 from lyra.enums import Environment, OrderSide
 from lyra.lyra import LyraClient
-from tests.test_main import TEST_PRIVATE_KEY
+from tests.conftest import TEST_PRIVATE_KEY
 
 
 def main():
