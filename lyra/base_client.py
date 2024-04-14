@@ -11,7 +11,7 @@ import requests
 from eth_account.messages import encode_defunct
 from rich import print
 from web3 import Web3
-from websocket import create_connection
+from websocket import WebSocketConnectionClosedException, create_connection
 
 from lyra.constants import CONTRACTS, PUBLIC_HEADERS, TEST_PRIVATE_KEY
 from lyra.enums import (
@@ -295,22 +295,37 @@ class BaseClient:
         )
         return self.web3_client.keccak(encoded_data)
 
+    @property
+    def ws(self):
+        if not hasattr(self, '_ws'):
+            self._ws = self.connect_ws()
+        if not self._ws.connected:
+            self._ws = self.connect_ws()
+        return self._ws
+
     def login_client(
         self,
+        retries=3,
     ):
         login_request = {
             'method': 'public/login',
             'params': self.sign_authentication_header(),
             'id': str(int(time.time())),
         }
-        self.ws.send(json.dumps(login_request))
-        # we need to wait for the response
-        while True:
-            message = json.loads(self.ws.recv())
-            if message['id'] == login_request['id']:
-                if "result" not in message:
-                    raise Exception(f"Unable to login {message}")
-                break
+        try:
+            self.ws.send(json.dumps(login_request))
+            # we need to wait for the response
+            while True:
+                message = json.loads(self.ws.recv())
+                if message['id'] == login_request['id']:
+                    if "result" not in message:
+                        raise Exception(f"Unable to login {message}")
+                    break
+        except (WebSocketConnectionClosedException, Exception) as error:
+            if retries:
+                time.sleep(1)
+                self.login_client(retries=retries - 1)
+            raise error
 
     def fetch_ticker(self, instrument_name):
         """

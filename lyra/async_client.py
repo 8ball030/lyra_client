@@ -51,7 +51,6 @@ class AsyncClient(BaseClient):
             print(f"Using wallet: {wallet}")
         self.subaccount_id = subaccount_id
         print(f"Using subaccount id: {self.subaccount_id}")
-        self.ws = None
         self.message_queues = {}
         self.connecting = False
 
