@@ -1,0 +1,72 @@
+site_name: auto_dev
+site_url: https://8ball030.github.io/auto_dev
+repo_url: https://github.com/8ball030/auto_dev
+repo_name: 8ball030/auto_dev
+#strict: true
+nav:
+  - Home: index.md
+  # - Usage: usage.md
+  - Reference:
+    - "constants": api/constants.md
+  #   - "utils": utils.md
+theme:
+  name: material
+  language: en
+  #logo: assets/logo.png
+  palette:
+    scheme: slate
+    primary: indigo
+    accent: indigo
+  features:
+    - navigation.indexes
+    - navigation.instant
+    - navigation.tabs.sticky
+markdown_extensions:
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.mark
+  - pymdownx.tilde
+  - pymdownx.tabbed
+  - attr_list
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      linenums: false
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.details
+  - admonition
+  - toc:
+      baselevel: 2
+      permalink: true
+      slugify: !!python/name:pymdownx.slugs.uslugify
+  - meta
+plugins:
+  - include-markdown
+  - search:
+      lang: en
+  - mkdocstrings
+extra:
+  social:
+    - icon: fontawesome/brands/twitter
+      # replace with your own tweet link below
+      link: https://github.com/waynerv/cookiecutter-pypackage
+      name: Tweet
+    - icon: fontawesome/brands/facebook
+      # replace with your own facebook link below
+      link: https://github.com/waynerv/cookiecutter-pypackage
+      name: Facebook
+    - icon: fontawesome/brands/github
+      link: https://github.com/8ball030/auto_dev
+      name: Github
+    - icon: material/email
+      link: "mailto:8ball030@gmail.com"
+  # to enable disqus, uncomment the following and put your disqus id below
+  # disqus: disqus_id
+# uncomment the following and put your google tracking id below to enable GA
+#google_analytics:
+  #- UA-xxx
+  #- auto
