@@ -26,6 +26,7 @@ class AsyncClient(BaseClient):
 
     listener = None
     subscribing = False
+    _ws = None
 
     def __init__(
         self,
@@ -53,6 +54,15 @@ class AsyncClient(BaseClient):
         print(f"Using subaccount id: {self.subaccount_id}")
         self.message_queues = {}
         self.connecting = False
+        # we make sure to get the event loop
+
+    @property
+    async def ws(self):
+        if self._ws is None:
+            self._ws = await self.connect_ws()
+        if not self._ws.connected:
+            self._ws = await self.connect_ws()
+        return self._ws
 
     async def fetch_ticker(self, instrument_name: str):
         """
@@ -60,6 +70,9 @@ class AsyncClient(BaseClient):
         """
         id = str(int(time.time()))
         payload = {"instrument_name": instrument_name}
+        if not self.ws:
+            await self.connect_ws()
+
         self.ws.send(json.dumps({"method": "public/get_ticker", "params": payload, "id": id}))
 
         # we now wait for the response
@@ -95,7 +108,7 @@ class AsyncClient(BaseClient):
         self.connecting = True
         session = aiohttp.ClientSession()
         ws = await session.ws_connect(self.contracts['WS_ADDRESS'])
-        self.ws = ws
+        self._ws = ws
         self.connecting = False
         return ws
 
@@ -132,8 +145,8 @@ class AsyncClient(BaseClient):
             'params': self.sign_authentication_header(),
             'id': str(int(time.time())),
         }
-        await self.ws.send_json(login_request)
-        async for data in self.ws:
+        await self._ws.send_json(login_request)
+        async for data in self._ws:
             message = json.loads(data.data)
             if message['id'] == login_request['id']:
                 if "result" not in message:
@@ -210,6 +223,8 @@ class AsyncClient(BaseClient):
         instrument_type: InstrumentType = InstrumentType.OPTION,
         currency: UnderlyingCurrency = UnderlyingCurrency.BTC,
     ):
+        if not self._ws:
+            await self.connect_ws()
         instruments = await self.fetch_instruments(instrument_type=instrument_type, currency=currency)
         instrument_names = [i['instrument_name'] for i in instruments]
         id_base = str(int(time.time()))
@@ -218,17 +233,31 @@ class AsyncClient(BaseClient):
         }
         for id, instrument_name in ids_to_instrument_names.items():
             payload = {"instrument_name": instrument_name}
-            self.ws.send(json.dumps({'method': 'public/get_ticker', 'params': payload, 'id': id}))
-            await asyncio.sleep(0.05)  # otherwise we get rate limited...
+            await self._ws.send_json({'method': 'public/get_ticker', 'params': payload, 'id': id})
+            await asyncio.sleep(0.1)  # otherwise we get rate limited...
         results = {}
         while ids_to_instrument_names:
-            message = json.loads(self.ws.recv())
+            message = await self._ws.receive()
+            if message is None:
+                continue
+            if 'error' in message:
+                raise Exception(f"Error fetching ticker {message}")
+            if message.type == aiohttp.WSMsgType.CLOSED:
+                # we try to reconnect
+                print(f"Erorr fetching ticker {message}...")
+                self._ws = await self.connect_ws()
+                return await self.fetch_tickers(instrument_type, currency)
+            message = json.loads(message.data)
             if message['id'] in ids_to_instrument_names:
-                results[message['result']['instrument_name']] = message['result']
+                try:
+                    results[message['result']['instrument_name']] = message['result']
+                except KeyError:
+                    print(f"Error fetching ticker {message}")
                 del ids_to_instrument_names[message['id']]
         return results
 
     async def get_collaterals(self):
+        breakpoint()
         return super().get_collaterals()
 
     async def get_positions(self, currency: UnderlyingCurrency = UnderlyingCurrency.BTC):
