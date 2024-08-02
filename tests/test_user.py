@@ -10,6 +10,7 @@ import pytest
 from lyra.enums import OrderSide, OrderType
 
 
+@pytest.mark.skip(reason="This test is not meant to be run in CI")
 @pytest.mark.parametrize(
     "instrument_name, side, price",
     [
