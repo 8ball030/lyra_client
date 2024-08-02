@@ -257,7 +257,6 @@ class AsyncClient(BaseClient):
         return results
 
     async def get_collaterals(self):
-        breakpoint()
         return super().get_collaterals()
 
     async def get_positions(self, currency: UnderlyingCurrency = UnderlyingCurrency.BTC):
