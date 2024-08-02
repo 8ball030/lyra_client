@@ -5,6 +5,8 @@ Implement tests for the RFQ class.
 
 from dataclasses import asdict, dataclass
 
+import pytest
+
 from lyra.enums import OrderSide
 
 LEG_1_NAME = 'ETH-20240329-2400-C'
@@ -33,6 +35,7 @@ class Rfq:
         return {"legs": [asdict(self.leg_1), asdict(self.leg_2)], "subaccount_id": self.subaccount_id}
 
 
+@pytest.mark.skip(reason="This test is not meant to be run in CI")
 def test_lyra_client_create_rfq(
     lyra_client,
 ):
@@ -47,6 +50,7 @@ def test_lyra_client_create_rfq(
     assert lyra_client.send_rfq(rfq.to_dict())
 
 
+@pytest.mark.skip(reason="This test is not meant to be run in CI")
 def test_lyra_client_create_quote(
     lyra_client,
 ):
@@ -68,9 +72,9 @@ def test_lyra_client_create_quote(
     )
     # we now sign it
     assert lyra_client._sign_quote(quote)
-    breakpoint()
 
 
+@pytest.mark.skip(reason="This test is not meant to be run in CI")
 def test_poll_rfqs(lyra_client):
     """
     Test the LyraClient class.
